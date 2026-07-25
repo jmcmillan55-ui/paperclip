@@ -420,6 +420,6 @@ storybook-visual, and docker workflows.
   drift silently.
 - Storybook visual diffs on non-Linux hosts are almost always font rasterization, not a
   real regression.
-- `AGENTS.md` §11 contains notes specific to a different downstream fork (`HenkDz/paperclip`,
-  built-in Hermes adapters, port 3101, NTFS workarounds). Those do not apply to this
-  checkout unless you are on that fork's branches — ignore them here.
+- Adapter guidance lives in `AGENTS.md` §12 and `packages/adapters/AUTHORING.md`; built-in
+  adapters are declared in `server/src/adapters/builtin-adapter-types.ts` and wired in
+  `registry.ts`, so adding one touches both plus `ui/src/adapters/`.
