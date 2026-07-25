@@ -406,6 +406,15 @@ Repo hygiene:
 Then typecheck, sharded Vitest, build, and (label- or workflow-gated) e2e, release-smoke,
 storybook-visual, and docker workflows.
 
+**Fork posture.** On this fork the publish and lockfile workflows are `workflow_dispatch`
+only — `release.yml`, `docker.yml`, `agent-runtime-images.yml`, and `refresh-lockfile.yml`
+do not fire on pushes to `master`. Two consequences: releases and container images are
+started deliberately from the Actions tab rather than by merging, and `pnpm-lock.yaml` is
+not regenerated automatically. Since `pr.yml` still rejects PRs that commit the lockfile,
+refresh it by running `refresh-lockfile` on demand or by using a branch named exactly
+`chore/refresh-lockfile`, which that policy job exempts. These four files therefore diverge
+from upstream and will conflict on upstream merges; keep the fork's `on:` block.
+
 ---
 
 ## 12. Gotchas
