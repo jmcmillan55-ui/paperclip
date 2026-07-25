@@ -1,12 +1,9 @@
 name: Agent runtime images
 
+# Fork note: the push-to-master trigger is intentionally removed on this fork so
+# merging to master does not build and push agent runtime images. Image builds
+# stay available on demand via workflow_dispatch.
 on:
-  push:
-    branches: [master]
-    paths:
-      - "docker/agent-runtime/**"
-      - "tools/agent-shim/**"
-      - ".github/workflows/agent-runtime-images.yml"
   workflow_dispatch:
     inputs:
       version:

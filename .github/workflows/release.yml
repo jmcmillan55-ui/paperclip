@@ -1,9 +1,9 @@
 name: Release
 
+# Fork note: the push-to-master trigger is intentionally removed on this fork so
+# merging to master does not run verify_canary/publish_canary. Publishing stays
+# available on demand via workflow_dispatch.
 on:
-  push:
-    branches:
-      - master
   workflow_dispatch:
     inputs:
       source_ref:

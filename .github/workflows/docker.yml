@@ -1,11 +1,10 @@
 name: Docker
 
+# Fork note: the push-to-master and v* tag triggers are intentionally removed on
+# this fork so merging to master does not build and push container images.
+# Image builds stay available on demand via workflow_dispatch.
 on:
-  push:
-    branches:
-      - "master"
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
