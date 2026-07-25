@@ -1,9 +1,9 @@
 name: Refresh Lockfile
 
+# Fork note: the push-to-master trigger is intentionally removed on this fork so
+# merging to master does not open and auto-merge a lockfile-refresh PR. Run this
+# on demand via workflow_dispatch when a manifest change needs a new lockfile.
 on:
-  push:
-    branches:
-      - master
   workflow_dispatch:
 
 concurrency:
