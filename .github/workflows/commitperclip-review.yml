@@ -1,11 +1,17 @@
 name: commitperclip PR Review
 
+# Fork note: the pull_request_target trigger is intentionally removed on this
+# fork. The review step requires COMMITPERCLIP_KEY, a secret held on upstream
+# paperclipai/paperclip, and forks never inherit secrets — so this workflow
+# could only ever fail here, turning every PR permanently red for a reason
+# unrelated to the change. Restore the trigger below if this fork is ever given
+# its own commitperclip key.
+#
+# Upstream note, preserved: always runs from base branch context — never
+# executes PR code. pull_request_target gives access to secrets for untrusted
+# fork PRs.
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-
-# Always runs from base branch context — never executes PR code.
-# pull_request_target gives access to secrets for untrusted fork PRs.
+  workflow_dispatch:
 
 permissions:
   pull-requests: write
