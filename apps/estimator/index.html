@@ -1,0 +1,1933 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>HJM Project Estimator</title>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   TOKENS — every visual value in this file comes from here.
+   Light is the default ground; dark is a token-level swap.
+   ───────────────────────────────────────────────────────────── */
+:root {
+  --hunter:        #2E5339;
+  --hunter-deep:   #1B3323;
+  --hunter-lift:   #3D6B4A;
+  --hunter-tint:   #EDF2EE;
+  --hunter-tint-2: #DFE9E1;
+
+  --canvas:  #F6F9F6;
+  --paper:   #FFFFFF;
+  --panel:   #FFFFFF;
+  --ink:     #14201A;
+  --ink-2:   #34473B;
+  --muted:   #5C6B61;
+  --faint:   #8A9A90;
+  --line:    #D3DED6;
+  --line-2:  #E6EDE8;
+
+  --good: #2E7D4F;
+  --warn: #B07419;
+  --crit: #A63328;
+  --brass: #A67C1A;          /* reserved: the profit figure only */
+
+  --field-bg:     #FFFFFF;
+  --field-line:   #C9D6CD;
+  --field-focus:  #2E5339;
+  --shadow-sm: 0 1px 2px rgba(20, 32, 26, .06);
+  --shadow-md: 0 4px 14px rgba(20, 32, 26, .10);
+  --shadow-lg: 0 14px 40px rgba(20, 32, 26, .16);
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+  --r1: 3px;  --r2: 6px;  --r3: 10px;
+
+  --t-xs: 11px; --t-sm: 13px; --t-md: 15px;
+  --t-lg: 19px; --t-xl: 25px; --t-2xl: 33px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --hunter:        #6FA97E;
+    --hunter-deep:   #8FC49C;
+    --hunter-lift:   #5B9169;
+    --hunter-tint:   #1A251E;
+    --hunter-tint-2: #212E25;
+
+    --canvas: #0F1512;
+    --paper:  #151E18;
+    --panel:  #16211B;
+    --ink:    #E8F0EA;
+    --ink-2:  #C3D3C8;
+    --muted:  #93A69A;
+    --faint:  #6E8175;
+    --line:   #27332B;
+    --line-2: #202B23;
+
+    --good: #5FBF85;
+    --warn: #D9A03F;
+    --crit: #E0705F;
+    --brass: #D6AC4E;
+
+    --field-bg:   #101914;
+    --field-line: #2E3D33;
+    --field-focus: #6FA97E;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-md: 0 4px 14px rgba(0,0,0,.45);
+    --shadow-lg: 0 14px 40px rgba(0,0,0,.55);
+  }
+}
+
+/* The viewer's theme toggle must win over the OS preference, both ways. */
+:root[data-theme="dark"] {
+  --hunter: #6FA97E; --hunter-deep: #8FC49C; --hunter-lift: #5B9169;
+  --hunter-tint: #1A251E; --hunter-tint-2: #212E25;
+  --canvas: #0F1512; --paper: #151E18; --panel: #16211B;
+  --ink: #E8F0EA; --ink-2: #C3D3C8; --muted: #93A69A; --faint: #6E8175;
+  --line: #27332B; --line-2: #202B23;
+  --good: #5FBF85; --warn: #D9A03F; --crit: #E0705F; --brass: #D6AC4E;
+  --field-bg: #101914; --field-line: #2E3D33; --field-focus: #6FA97E;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 4px 14px rgba(0,0,0,.45);
+  --shadow-lg: 0 14px 40px rgba(0,0,0,.55);
+}
+:root[data-theme="light"] {
+  --hunter: #2E5339; --hunter-deep: #1B3323; --hunter-lift: #3D6B4A;
+  --hunter-tint: #EDF2EE; --hunter-tint-2: #DFE9E1;
+  --canvas: #F6F9F6; --paper: #FFFFFF; --panel: #FFFFFF;
+  --ink: #14201A; --ink-2: #34473B; --muted: #5C6B61; --faint: #8A9A90;
+  --line: #D3DED6; --line-2: #E6EDE8;
+  --good: #2E7D4F; --warn: #B07419; --crit: #A63328; --brass: #A67C1A;
+  --field-bg: #FFFFFF; --field-line: #C9D6CD; --field-focus: #2E5339;
+  --shadow-sm: 0 1px 2px rgba(20,32,26,.06);
+  --shadow-md: 0 4px 14px rgba(20,32,26,.10);
+  --shadow-lg: 0 14px 40px rgba(20,32,26,.16);
+}
+
+/* ── base ── */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font: 400 var(--t-md)/1.5 var(--sans);
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+h1,h2,h3,h4 { margin: 0; text-wrap: balance; font-weight: 650; letter-spacing: -.01em; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--field-focus); outline-offset: 2px; border-radius: var(--r1); }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ── app shell ── */
+.chrome {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--hunter-deep);
+  border-bottom: 1px solid rgba(0,0,0,.2);
+}
+:root[data-theme="dark"] .chrome, .chrome { background: var(--hunter-deep); }
+@media (prefers-color-scheme: dark) { .chrome { background: #0C120E; } }
+:root[data-theme="dark"] .chrome { background: #0C120E; }
+:root[data-theme="light"] .chrome { background: #1B3323; }
+
+.chrome-in {
+  max-width: 1180px; margin: 0 auto;
+  padding: var(--s3) var(--s4);
+  display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: var(--s3); margin-right: auto; }
+.brand-mark {
+  width: 34px; height: 34px; flex: none;
+  border: 1.5px solid rgba(255,255,255,.55);
+  display: grid; place-items: center;
+  font: 700 var(--t-sm)/1 var(--mono);
+  color: #fff; letter-spacing: .02em;
+}
+.brand-name { color: #fff; font-size: var(--t-md); font-weight: 650; line-height: 1.15; }
+.brand-sub {
+  color: rgba(255,255,255,.62); font-family: var(--mono);
+  font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .1em;
+}
+.tabs { display: flex; gap: var(--s1); flex-wrap: wrap; }
+.tab {
+  appearance: none; background: transparent; cursor: pointer;
+  border: 1px solid transparent; border-radius: var(--r2);
+  padding: var(--s2) var(--s3);
+  color: rgba(255,255,255,.72);
+  font-size: var(--t-sm); font-weight: 550;
+  transition: background .12s, color .12s;
+}
+.tab:hover { background: rgba(255,255,255,.10); color: #fff; }
+.tab[aria-current="true"] { background: #fff; color: var(--hunter-deep); font-weight: 650; }
+:root[data-theme="dark"] .tab[aria-current="true"] { background: var(--hunter); color: #0C120E; }
+@media (prefers-color-scheme: dark) { .tab[aria-current="true"] { background: var(--hunter); color: #0C120E; } }
+:root[data-theme="light"] .tab[aria-current="true"] { background: #fff; color: var(--hunter-deep); }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: var(--s5) var(--s4) var(--s8); }
+.view[hidden] { display: none; }
+
+/* ── panels: carbon-copy form sections ── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r3);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--s5);
+  overflow: hidden;
+}
+.panel-head {
+  display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
+  padding: var(--s4) var(--s4) var(--s3);
+  border-bottom: 1px solid var(--line-2);
+}
+.eyebrow {
+  font-family: var(--mono); font-size: var(--t-xs);
+  text-transform: uppercase; letter-spacing: .13em;
+  color: var(--hunter); font-weight: 600;
+}
+.panel-head h2 { font-size: var(--t-lg); }
+.panel-head .hint { color: var(--muted); font-size: var(--t-sm); margin-left: auto; }
+.panel-body { padding: var(--s4); }
+.panel-body.flush { padding: 0; }
+
+/* ── forms ── */
+.grid { display: grid; gap: var(--s3); }
+.g2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+@media (max-width: 760px) { .g2, .g3, .g4 { grid-template-columns: 1fr; } }
+
+.field { display: flex; flex-direction: column; gap: var(--s1); min-width: 0; }
+.field > label {
+  font-family: var(--mono); font-size: var(--t-xs);
+  text-transform: uppercase; letter-spacing: .09em;
+  color: var(--muted); font-weight: 600;
+}
+input[type="text"], input[type="number"], input[type="date"], input[type="email"], select, textarea {
+  background: var(--field-bg);
+  border: 1px solid var(--field-line);
+  border-radius: var(--r2);
+  padding: 9px var(--s3);
+  width: 100%; min-width: 0;
+  transition: border-color .12s, box-shadow .12s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--field-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--field-focus) 18%, transparent);
+  outline: none;
+}
+input[type="number"] { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+textarea { resize: vertical; min-height: 74px; line-height: 1.55; }
+input::placeholder, textarea::placeholder { color: var(--faint); }
+
+/* ── buttons ── */
+.btn {
+  appearance: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
+  background: var(--hunter); color: #fff;
+  border: 1px solid var(--hunter); border-radius: var(--r2);
+  padding: 9px var(--s4);
+  font-size: var(--t-sm); font-weight: 600;
+  transition: filter .12s, background .12s;
+}
+:root[data-theme="dark"] .btn { color: #0C120E; }
+@media (prefers-color-scheme: dark) { .btn { color: #0C120E; } }
+:root[data-theme="light"] .btn { color: #fff; }
+.btn:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; color: var(--hunter); border-color: var(--field-line); }
+.btn.ghost:hover { background: var(--hunter-tint); border-color: var(--hunter); }
+.btn.danger { background: transparent; color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, transparent); }
+.btn.danger:hover { background: color-mix(in srgb, var(--crit) 10%, transparent); }
+.btn.sm { padding: 6px var(--s3); font-size: var(--t-xs); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-row { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
+.icon-btn {
+  appearance: none; cursor: pointer; background: transparent;
+  border: 1px solid transparent; border-radius: var(--r2);
+  color: var(--faint); width: 30px; height: 30px; flex: none;
+  display: grid; place-items: center; font-size: var(--t-md); line-height: 1;
+}
+.icon-btn:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 35%, transparent); }
+
+/* ── line-item rows: grid on desktop, labeled cards on phone ── */
+.lines { display: flex; flex-direction: column; }
+.lrow {
+  display: grid; gap: var(--s2); align-items: center;
+  padding: var(--s2) var(--s4);
+  border-bottom: 1px solid var(--line-2);
+}
+.lrow.head {
+  background: var(--hunter-tint);
+  border-bottom: 1px solid var(--line);
+  padding-top: var(--s2); padding-bottom: var(--s2);
+}
+.lrow.head > span {
+  font-family: var(--mono); font-size: var(--t-xs); font-weight: 650;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--hunter);
+}
+.lrow .ta-r { text-align: right; }
+.lrow-out {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: var(--t-sm); text-align: right; white-space: nowrap;
+}
+.lrow-out.price { font-weight: 650; color: var(--ink); }
+.lrow-out.cost { color: var(--muted); }
+.lines-empty { padding: var(--s5) var(--s4); color: var(--muted); font-size: var(--t-sm); text-align: center; }
+.lines-foot { padding: var(--s3) var(--s4); display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
+
+/* The sticky totals bar floats over the bottom of the viewport, so anything
+   scrolled flush to the bottom edge would land underneath it. Keep controls
+   clear of it when the browser scrolls them into view. */
+.panel, .lrow, .lines-foot, .rate-row { scroll-margin-bottom: 140px; }
+
+/* row column templates */
+.tpl-equip { grid-template-columns: minmax(0,3fr) 76px 74px 92px 74px 96px 30px; }
+.tpl-labor { grid-template-columns: minmax(0,3fr) 76px 76px 92px 74px 96px 30px; }
+.tpl-mat   { grid-template-columns: minmax(0,3fr) 76px 74px 92px 74px 96px 30px; }
+.tpl-mob   { grid-template-columns: minmax(0,3fr) 76px 74px 92px 74px 96px 30px; }
+.tpl-lodge { grid-template-columns: minmax(0,3fr) 70px 70px 88px 74px 96px 30px; }
+
+@media (max-width: 860px) {
+  .lrow.head { display: none; }
+  .lrow {
+    grid-template-columns: 1fr 1fr !important;
+    gap: var(--s3);
+    padding: var(--s4);
+    border-bottom: 6px solid var(--canvas);
+    position: relative;
+  }
+  .lrow > .cell-wide { grid-column: 1 / -1; padding-right: 38px; }
+  .lrow > [data-label]::before {
+    content: attr(data-label);
+    display: block; margin-bottom: 3px;
+    font-family: var(--mono); font-size: var(--t-xs); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+  }
+  .lrow > .lrow-out { text-align: left; }
+  .lrow > .del { position: absolute; top: var(--s4); right: var(--s4); }
+}
+
+/* ── rate editor rows ── */
+.rate-row {
+  display: grid; grid-template-columns: 58px minmax(0,1fr) 110px 96px 112px 30px;
+  gap: var(--s2); align-items: center;
+  padding: var(--s2) var(--s4); border-bottom: 1px solid var(--line-2);
+}
+.rate-row.head { background: var(--hunter-tint); border-bottom: 1px solid var(--line); }
+.rate-row.head > span {
+  font-family: var(--mono); font-size: var(--t-xs); font-weight: 650;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--hunter);
+}
+.code-chip {
+  font-family: var(--mono); font-size: var(--t-xs); font-weight: 650;
+  color: var(--hunter); background: var(--hunter-tint);
+  border: 1px solid var(--line); border-radius: var(--r1);
+  padding: 3px 6px; text-align: center; letter-spacing: .03em;
+}
+@media (max-width: 860px) {
+  .rate-row.head { display: none; }
+  .rate-row {
+    grid-template-columns: 58px 1fr 1fr; gap: var(--s3);
+    padding: var(--s4); border-bottom: 6px solid var(--canvas); position: relative;
+  }
+  .rate-row > .rname { grid-column: 2 / -1; padding-right: 38px; }
+  .rate-row > [data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 3px;
+    font-family: var(--mono); font-size: var(--t-xs); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+  }
+  .rate-row > .del { position: absolute; top: var(--s4); right: var(--s4); }
+}
+
+/* ── flags ── */
+.flag {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: var(--t-xs); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .07em;
+  padding: 3px 7px; border-radius: var(--r1); border: 1px solid;
+}
+.flag.no-rate { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 42%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.flag.trailer { color: var(--muted); border-color: var(--line); background: var(--hunter-tint); }
+.flag.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); background: color-mix(in srgb, var(--good) 10%, transparent); }
+
+.notice {
+  display: flex; gap: var(--s3); align-items: flex-start;
+  padding: var(--s3) var(--s4); border-radius: var(--r2);
+  border: 1px solid color-mix(in srgb, var(--warn) 38%, transparent);
+  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  font-size: var(--t-sm); color: var(--ink-2); margin-bottom: var(--s4);
+}
+.notice strong { color: var(--ink); }
+.notice.info { border-color: var(--line); background: var(--hunter-tint); }
+
+/* ── totals bar (sticky summary before detail) ── */
+.totalbar {
+  position: sticky; bottom: 0; z-index: 30;
+  background: var(--panel);
+  border-top: 2px solid var(--hunter);
+  box-shadow: var(--shadow-lg);
+  margin: 0 calc(-1 * var(--s4));
+  padding: var(--s3) var(--s4);
+}
+.totalbar-in {
+  max-width: 1180px; margin: 0 auto;
+  display: flex; gap: var(--s5); align-items: center; flex-wrap: wrap;
+}
+.tstat { display: flex; flex-direction: column; gap: 1px; }
+.tstat > .k {
+  font-family: var(--mono); font-size: var(--t-xs); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+}
+.tstat > .v {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: var(--t-lg); font-weight: 650; line-height: 1.15;
+}
+.tstat.total > .v { font-size: var(--t-xl); color: var(--hunter); }
+.tstat.profit > .v { color: var(--brass); }
+.tstat.margin > .v { color: var(--ink-2); }
+.tstat .v.bad { color: var(--crit); }
+.totalbar .btn-row { margin-left: auto; }
+@media (max-width: 700px) {
+  .totalbar-in { gap: var(--s4); }
+  .tstat > .v { font-size: var(--t-md); }
+  .tstat.total > .v { font-size: var(--t-lg); }
+  .totalbar .btn-row { margin-left: 0; width: 100%; }
+  .totalbar .btn-row .btn { flex: 1; }
+}
+
+/* ── estimate list ── */
+.elist { display: flex; flex-direction: column; }
+.ecard {
+  display: grid; grid-template-columns: minmax(0,1fr) auto auto;
+  gap: var(--s3) var(--s5); align-items: center;
+  padding: var(--s4); border-bottom: 1px solid var(--line-2);
+  text-align: left; width: 100%;
+  background: transparent; border-left: 0; border-right: 0; border-top: 0;
+  cursor: pointer;
+}
+.ecard:hover { background: var(--hunter-tint); }
+.ecard-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ecard-t .n {
+  font-family: var(--mono); font-size: var(--t-xs); color: var(--hunter);
+  letter-spacing: .06em; font-weight: 650;
+}
+.ecard-t .p { font-weight: 650; font-size: var(--t-md); }
+.ecard-t .c { color: var(--muted); font-size: var(--t-sm); }
+.ecard-n { text-align: right; }
+.ecard-n .amt {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-weight: 650; font-size: var(--t-md); color: var(--hunter);
+}
+.ecard-n .sub { font-family: var(--mono); font-size: var(--t-xs); color: var(--muted); }
+@media (max-width: 640px) {
+  .ecard { grid-template-columns: 1fr auto; }
+  .ecard-n { grid-column: 1; grid-row: 2; text-align: left; }
+  .ecard-acts { grid-column: 2; grid-row: 2; }
+}
+
+/* ── the quote document ── */
+.paper-wrap { display: flex; justify-content: center; }
+.paper {
+  background: #fff; color: #14201A;
+  width: 100%; max-width: 8.5in;
+  padding: 0.6in 0.65in;
+  border: 1px solid var(--line); border-radius: var(--r2);
+  box-shadow: var(--shadow-md);
+  font-family: var(--serif); font-size: 11.5pt; line-height: 1.5;
+}
+.paper * { color: inherit; }
+.q-head { display: flex; gap: var(--s5); align-items: flex-start; border-bottom: 2.5px solid #1B3323; padding-bottom: 12px; }
+.q-co { flex: 1; min-width: 0; }
+.q-co-name { font-family: var(--sans); font-size: 19pt; font-weight: 700; letter-spacing: -.015em; color: #1B3323; line-height: 1.1; }
+.q-co-meta { font-family: var(--sans); font-size: 8.5pt; color: #4A5A50; line-height: 1.6; margin-top: 5px; white-space: pre-line; }
+.q-logo { max-height: 70px; max-width: 190px; object-fit: contain; }
+.q-title { text-align: right; flex: none; }
+.q-title .w {
+  font-family: var(--mono); font-size: 8.5pt; letter-spacing: .18em;
+  text-transform: uppercase; color: #2E5339; font-weight: 700;
+}
+.q-title .no { font-family: var(--mono); font-size: 13pt; font-weight: 700; margin-top: 2px; }
+.q-title .dt { font-family: var(--sans); font-size: 8.5pt; color: #4A5A50; margin-top: 3px; }
+
+.q-meta { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s5); margin: 18px 0; }
+.q-block .lbl {
+  font-family: var(--mono); font-size: 8pt; letter-spacing: .14em;
+  text-transform: uppercase; color: #2E5339; font-weight: 700;
+  border-bottom: 1px solid #D3DED6; padding-bottom: 3px; margin-bottom: 6px;
+}
+.q-block .val { font-size: 10.5pt; line-height: 1.5; white-space: pre-line; }
+.q-block .val strong { font-weight: 700; }
+
+.q-scope { margin: 18px 0; }
+.q-scope p { margin: 0; white-space: pre-line; }
+
+/* The quote is laid out for Letter paper. On a phone the itemized table is
+   wider than the screen, so it scrolls inside its own box and the page body
+   never scrolls sideways. Print restores the full-width layout. */
+.q-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media print { .q-scroll { overflow: visible; } }
+
+table.q-tbl { width: 100%; border-collapse: collapse; margin: 8px 0 0; min-width: 27rem; }
+table.q-tbl th {
+  font-family: var(--mono); font-size: 8pt; letter-spacing: .1em;
+  text-transform: uppercase; color: #fff; background: #1B3323;
+  text-align: left; padding: 6px 8px; font-weight: 700;
+}
+table.q-tbl th.r, table.q-tbl td.r { text-align: right; }
+table.q-tbl td { padding: 6px 8px; border-bottom: 1px solid #E6EDE8; font-size: 10.5pt; vertical-align: top; }
+table.q-tbl td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 10pt; }
+table.q-tbl tr.grp td {
+  font-family: var(--mono); font-size: 8pt; letter-spacing: .11em; text-transform: uppercase;
+  color: #2E5339; font-weight: 700; background: #EDF2EE; padding: 5px 8px; border-bottom: 1px solid #D3DED6;
+}
+table.q-tbl tr.sub td { border-bottom: 1px solid #D3DED6; }
+table.q-tbl tr.sub td.n { font-weight: 700; }
+
+.q-tot { margin-top: 14px; display: flex; justify-content: flex-end; }
+.q-tot table { border-collapse: collapse; min-width: 3.1in; }
+.q-tot td { padding: 5px 0 5px 20px; font-size: 10.5pt; }
+.q-tot td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.q-tot tr.grand td {
+  border-top: 2.5px solid #1B3323; padding-top: 9px;
+  font-family: var(--sans); font-weight: 700; font-size: 13pt; color: #1B3323;
+}
+.q-tot tr.grand td.n { font-family: var(--mono); }
+
+.q-terms { margin-top: 22px; border-top: 1px solid #D3DED6; padding-top: 12px; }
+.q-terms .lbl {
+  font-family: var(--mono); font-size: 8pt; letter-spacing: .14em;
+  text-transform: uppercase; color: #2E5339; font-weight: 700; margin-bottom: 5px;
+}
+.q-terms p { margin: 0 0 10px; font-size: 9.5pt; line-height: 1.55; white-space: pre-line; }
+.q-sign { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 34px; }
+.q-sign .ln { border-bottom: 1px solid #14201A; height: 30px; }
+.q-sign .cap {
+  font-family: var(--mono); font-size: 7.5pt; letter-spacing: .11em;
+  text-transform: uppercase; color: #4A5A50; margin-top: 4px;
+}
+.q-foot {
+  margin-top: 20px; text-align: center;
+  font-family: var(--mono); font-size: 7.5pt; letter-spacing: .1em;
+  text-transform: uppercase; color: #6B7C71;
+}
+
+/* Phone: shrink the paper margins so the document stays readable on screen.
+   These are screen-only — the printed sheet keeps its full Letter margins. */
+@media screen and (max-width: 760px) {
+  .paper { padding: var(--s5) var(--s4); font-size: 10.5pt; }
+  .q-head { flex-direction: column; gap: var(--s3); }
+  .q-title { text-align: left; }
+  .q-meta { grid-template-columns: 1fr; gap: var(--s4); }
+  .q-sign { grid-template-columns: 1fr; gap: var(--s5); }
+  .q-tot table { min-width: 0; width: 100%; }
+}
+
+.toolbar {
+  display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap;
+  margin-bottom: var(--s4);
+}
+.toolbar .spacer { margin-left: auto; }
+.seg { display: inline-flex; border: 1px solid var(--field-line); border-radius: var(--r2); overflow: hidden; }
+.seg button {
+  appearance: none; background: var(--field-bg); border: 0; cursor: pointer;
+  padding: 7px var(--s3); font-size: var(--t-xs); font-weight: 600;
+  font-family: var(--mono); text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); border-right: 1px solid var(--field-line);
+}
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--hunter); color: #fff; }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { color: #0C120E; }
+@media (prefers-color-scheme: dark) { .seg button[aria-pressed="true"] { color: #0C120E; } }
+:root[data-theme="light"] .seg button[aria-pressed="true"] { color: #fff; }
+
+.checkline { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-sm); }
+.checkline input { width: auto; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
+  background: var(--hunter-deep); color: #fff;
+  padding: var(--s3) var(--s5); border-radius: var(--r2);
+  box-shadow: var(--shadow-lg); font-size: var(--t-sm); font-weight: 600;
+  z-index: 90; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+}
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+:root[data-theme="dark"] .toast { background: var(--hunter); color: #0C120E; }
+
+.subtle { color: var(--muted); font-size: var(--t-sm); }
+.mt4 { margin-top: var(--s4); }
+.divider { height: 1px; background: var(--line-2); margin: var(--s4) 0; }
+.cat-tot {
+  display: flex; justify-content: flex-end; gap: var(--s5);
+  padding: var(--s3) var(--s4); background: var(--hunter-tint);
+  border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: var(--t-sm); font-variant-numeric: tabular-nums;
+}
+.cat-tot .k { color: var(--muted); text-transform: uppercase; font-size: var(--t-xs); letter-spacing: .08em; font-weight: 600; }
+.cat-tot .v { font-weight: 650; }
+
+/* ── print: the quote document only ── */
+@media print {
+  .chrome, .toolbar, .totalbar, .toast, .notice { display: none !important; }
+  body { background: #fff; }
+  .wrap { max-width: none; padding: 0; }
+  .paper {
+    max-width: none; width: auto; border: 0; box-shadow: none;
+    padding: 0; border-radius: 0;
+  }
+  table.q-tbl { page-break-inside: auto; }
+  table.q-tbl tr { page-break-inside: avoid; }
+  .q-tot, .q-sign { page-break-inside: avoid; }
+  @page { margin: 0.55in; }
+}
+</style>
+</head>
+<body>
+
+<header class="chrome">
+  <div class="chrome-in">
+    <div class="brand">
+      <div class="brand-mark" id="brandMark">HJM</div>
+      <div>
+        <div class="brand-name" id="brandName">HJM</div>
+        <div class="brand-sub">Project Estimator</div>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-view="estimates" aria-current="true">Estimates</button>
+      <button class="tab" data-view="build">Build</button>
+      <button class="tab" data-view="quote">Quote</button>
+      <button class="tab" data-view="rates">Rates</button>
+      <button class="tab" data-view="setup">Setup</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ══════════ ESTIMATES ══════════ -->
+  <section class="view" id="view-estimates">
+    <div class="toolbar">
+      <button class="btn" id="newEst">+ New estimate</button>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="exportAll">Export backup</button>
+      <button class="btn ghost sm" id="importAll">Import backup</button>
+    </div>
+    <div id="rateWarn"></div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Job file</span>
+        <h2>Saved estimates</h2>
+        <span class="hint" id="estCount"></span>
+      </div>
+      <div class="panel-body flush">
+        <div class="elist" id="estList"></div>
+      </div>
+    </div>
+    <p class="subtle">
+      Estimates and rates are stored on this device only. Use <strong>Export backup</strong> to move
+      everything to another phone, tablet, or PC — or to keep a copy off the device.
+    </p>
+  </section>
+
+  <!-- ══════════ BUILD ══════════ -->
+  <section class="view" id="view-build" hidden>
+    <div id="buildBody"></div>
+  </section>
+
+  <!-- ══════════ QUOTE ══════════ -->
+  <section class="view" id="view-quote" hidden>
+    <div class="toolbar">
+      <div class="seg" id="detailSeg" role="group" aria-label="Quote detail level">
+        <button data-detail="detailed" aria-pressed="true">Itemized</button>
+        <button data-detail="category" aria-pressed="false">By section</button>
+        <button data-detail="lump" aria-pressed="false">Lump sum</button>
+      </div>
+      <label class="checkline"><input type="checkbox" id="qShowQty" checked /> Show quantities &amp; unit prices</label>
+      <div class="spacer"></div>
+      <button class="btn" id="printQuote">Print / Save PDF</button>
+    </div>
+    <div class="notice info">
+      <div><strong>Client-facing.</strong> Your costs and margins never appear here — only sell prices.
+      Print to PDF to email it, or print to paper.</div>
+    </div>
+    <div class="paper-wrap"><div class="paper" id="quotePaper"></div></div>
+  </section>
+
+  <!-- ══════════ RATES ══════════ -->
+  <section class="view" id="view-rates" hidden>
+    <div class="notice" id="ratesNotice">
+      <div><strong>Enter your rates once.</strong> These are your <em>costs</em> — what the machine or
+      the man actually costs you per hour, including fuel, wear, and burden. Margin gets added on top
+      at estimate time, so don't build profit into these numbers.</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Default margins</span>
+        <h2>Margin by category</h2>
+        <span class="hint">Gross margin — price = cost &divide; (1 &minus; margin)</span>
+      </div>
+      <div class="panel-body">
+        <div class="grid g3" id="marginFields"></div>
+        <div class="divider"></div>
+        <div class="grid g3">
+          <div class="field">
+            <label for="setOt">Overtime multiplier</label>
+            <input type="number" id="setOt" step="0.05" min="1" />
+          </div>
+          <div class="field">
+            <label for="setTax">Sales tax on materials (%)</label>
+            <input type="number" id="setTax" step="0.001" min="0" />
+          </div>
+          <div class="field">
+            <label for="setValid">Quote valid (days)</label>
+            <input type="number" id="setValid" step="1" min="1" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Labor</span>
+        <h2>Class rates</h2>
+        <span class="hint">Cost per hour, fully burdened</span>
+      </div>
+      <div class="panel-body flush">
+        <div class="rate-row head">
+          <span>Code</span><span>Class name</span><span>Cost / hr</span><span></span><span></span><span></span>
+        </div>
+        <div id="laborRates"></div>
+        <div class="lines-foot"><button class="btn ghost sm" id="addLabor">+ Add labor class</button></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Equipment</span>
+        <h2>Machine rates</h2>
+        <span class="hint" id="equipCount"></span>
+      </div>
+      <div class="panel-body">
+        <div class="grid g2">
+          <div class="field">
+            <label for="equipSearch">Filter</label>
+            <input type="text" id="equipSearch" placeholder="Search name or code — e.g. Tigercat, B12, dozer" />
+          </div>
+          <div class="field">
+            <label for="equipCat">Category</label>
+            <select id="equipCat"></select>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body flush">
+        <div class="rate-row head">
+          <span>Code</span><span>Equipment</span><span>Cost / unit</span><span>Unit</span><span>Category</span><span></span>
+        </div>
+        <div id="equipRates"></div>
+        <div class="lines-foot">
+          <button class="btn ghost sm" id="addEquip">+ Add equipment</button>
+          <span class="subtle">Trailers are flagged — your weekly sheet notes they aren't counted in equipment hours.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ SETUP ══════════ -->
+  <section class="view" id="view-setup" hidden>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Letterhead</span>
+        <h2>Company information</h2>
+        <span class="hint">Prints at the top of every quote</span>
+      </div>
+      <div class="panel-body">
+        <div class="grid g2">
+          <div class="field"><label for="coName">Company name</label><input type="text" id="coName" /></div>
+          <div class="field"><label for="coPhone">Phone</label><input type="text" id="coPhone" /></div>
+          <div class="field"><label for="coEmail">Email</label><input type="text" id="coEmail" /></div>
+          <div class="field"><label for="coLicense">License / cert #</label><input type="text" id="coLicense" /></div>
+        </div>
+        <div class="grid mt4">
+          <div class="field"><label for="coAddress">Address</label><textarea id="coAddress" placeholder="123 County Road 12&#10;Town, ST 00000"></textarea></div>
+        </div>
+        <div class="divider"></div>
+        <div class="field">
+          <label for="coLogo">Logo (optional)</label>
+          <input type="file" id="coLogo" accept="image/*" />
+          <span class="subtle">Stored on this device with your other settings.</span>
+        </div>
+        <div id="logoPreview" class="mt4"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Boilerplate</span>
+        <h2>Default terms &amp; exclusions</h2>
+        <span class="hint">Copied into each new estimate; editable per job</span>
+      </div>
+      <div class="panel-body grid">
+        <div class="field"><label for="setTerms">Terms</label><textarea id="setTerms" rows="5"></textarea></div>
+        <div class="field"><label for="setExcl">Exclusions</label><textarea id="setExcl" rows="5"></textarea></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Data</span>
+        <h2>Backup &amp; reset</h2>
+      </div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn ghost" id="exportAll2">Export backup file</button>
+          <button class="btn ghost" id="importAll2">Import backup file</button>
+          <button class="btn danger" id="resetAll">Reset everything</button>
+        </div>
+        <p class="subtle mt4">
+          Everything lives in this browser's local storage on this device. Clearing site data
+          deletes it, so export a backup after any big rate change.
+        </p>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+<input type="file" id="fileIn" accept="application/json" style="display:none" />
+
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════════════
+   Equipment catalog — transcribed from the HJM weekly field
+   labor & equipment sheet (Oct 2025), item codes B1–B39 kept so
+   the estimator and the field sheet speak the same language.
+   Rates start at 0: the operator enters their own costs.
+   ══════════════════════════════════════════════════════════════ */
+const SEED_EQUIPMENT = [
+  ["B1",  "Chipper Bandit 3590",                     "Chipper / Grinder"],
+  ["B2",  "D5K Dozer / Cat D3",                      "Dozer"],
+  ["B3",  "D6K Cat Dozer / Cat D4",                   "Dozer"],
+  ["B4",  "Cat D6N LGP / Cat D5",                     "Dozer"],
+  ["B5",  "D6T Cat Dozer / Cat D6",                   "Dozer"],
+  ["B6",  "Mini Excavator / Kubota 40",               "Excavator"],
+  ["B7",  "CAT Excavator 320, 323, 326",              "Excavator"],
+  ["B8",  "CAT 349 Excavator",                        "Excavator"],
+  ["B9",  "JD / Kubota 80 Mini Excavator",            "Excavator"],
+  ["B10", "316 Cat Excavator w/ hydraulic thumb",     "Excavator"],
+  ["B11", "CAT 336 Excavator w/ hydraulic thumb",     "Excavator"],
+  ["B12", "Tigercat 830 Track Cutter",                "Cutter"],
+  ["B13", "Tigercat 822 Track Cutter",                "Cutter"],
+  ["B14", "Tigercat 726 Rubber Tire Feller Buncher",  "Cutter"],
+  ["B15", "Morbark Whole Tree Track Grinder",         "Chipper / Grinder"],
+  ["B16", "Jarraff Track",                            "Trimmer"],
+  ["B17", "Jarraff Rubber Tire",                      "Trimmer"],
+  ["B18", "Knuckle Boom — 595, 538, 234",             "Loader"],
+  ["B19", "Cat 926M Loader",                          "Loader"],
+  ["B20", "Morooka / Terramac",                       "Off-road hauler"],
+  ["B21", "Mulcher 500 hp — 475 and 480B",            "Mulcher"],
+  ["B22", "Mulcher / Rubber Tire",                    "Mulcher"],
+  ["B23", "Mobile Pressure Washer",                   "Support"],
+  ["B24", "Cat Roller — 66 inch",                     "Compaction"],
+  ["B25", "Skidder",                                  "Skidder"],
+  ["B26", "Kubota Skidsteer",                         "Skidsteer"],
+  ["B27", "Kubota Skidsteer w/ mulcher",              "Skidsteer"],
+  ["B28", "Tractor — 58–100 hp",                      "Tractor"],
+  ["B29", "Tractor — 100–210 hp",                     "Tractor"],
+  ["B30", "Tractor & Hay Blower",                     "Tractor"],
+  ["B31", "Tractor & Square Bale Blower",             "Tractor"],
+  ["B32", "Gooseneck HD",                             "Trailer"],
+  ["B33", "Utility Trailer",                          "Trailer"],
+  ["B34", "Crew Truck",                               "Truck"],
+  ["B35", "Truck & Hay Blower",                       "Truck"],
+  ["B36", "Dump Truck — Tandem",                      "Truck"],
+  ["B37", "Dump Truck — Tri Axle",                    "Truck"],
+  ["B38", "Lowboy Truck / Dump / Palmer",             "Truck"],
+  ["B39", "UTV Side by Side",                         "Support"]
+];
+
+/* Labor classes as coded on the weekly sheet. Names are a best guess at
+   the abbreviations and are editable on the Rates screen. */
+const SEED_LABOR = [
+  ["CL", "Crew Leader"],
+  ["CM", "Crew Member"],
+  ["GM", "Groundman"],
+  ["TR", "Trainee"]
+];
+
+const CATEGORIES = [
+  { key: "equipment",   label: "Equipment",          eyebrow: "Machine time" },
+  { key: "labor",       label: "Labor",              eyebrow: "Field crew" },
+  { key: "materials",   label: "Materials",          eyebrow: "Purchased" },
+  { key: "mobilization",label: "Mobilization & travel", eyebrow: "Moves" },
+  { key: "lodging",     label: "Lodging & per diem", eyebrow: "Subsistence" }
+];
+
+const UNITS = ["hr", "day", "week", "month"];
+const MOB_UNITS = ["load", "mile", "trip", "each", "flat"];
+const MAT_UNITS = ["each", "ton", "yd³", "gal", "ft", "lf", "sf", "sy", "acre", "roll", "bag", "lot"];
+
+const DEFAULT_TERMS =
+  "Payment due net 30 from date of invoice.\n" +
+  "Quantities shown are estimated; final billing is based on actual hours and materials unless this quote is marked lump sum.\n" +
+  "Work performed during normal daylight hours, weather permitting. Standby time caused by conditions outside our control is billable at the rates above.\n" +
+  "Client is responsible for marking property lines, utilities, septic, irrigation, and any features to be protected prior to mobilization.";
+
+const DEFAULT_EXCLUSIONS =
+  "Permits, surveys, engineering, and environmental studies.\n" +
+  "Hauling or disposal of debris off site unless listed above.\n" +
+  "Stump grinding, seeding, erosion control, and hydroseeding unless listed above.\n" +
+  "Rock excavation, hazardous material handling, and unmarked underground obstructions.";
+
+/* ══════════════════════════════════════════════════════════════
+   Store
+   ══════════════════════════════════════════════════════════════ */
+const KEY = "hjm-estimator-v1";
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+function freshState() {
+  return {
+    version: 1,
+    company: { name: "HJM", address: "", phone: "", email: "", license: "", logo: "" },
+    settings: {
+      margins: { equipment: 30, labor: 30, materials: 20, mobilization: 25, lodging: 15, contingency: 0 },
+      otMultiplier: 1.5,
+      taxRate: 0,
+      validDays: 30,
+      terms: DEFAULT_TERMS,
+      exclusions: DEFAULT_EXCLUSIONS
+    },
+    equipment: SEED_EQUIPMENT.map(([code, name, category]) => ({
+      id: uid(), code, name, category, unit: "hr", cost: 0
+    })),
+    labor: SEED_LABOR.map(([code, name]) => ({ id: uid(), code, name, cost: 0 })),
+    estimates: [],
+    seq: 1,
+    currentId: null
+  };
+}
+
+let S = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return freshState();
+    const parsed = JSON.parse(raw);
+    const base = freshState();
+    // Shallow-merge so a state file written by an older build still opens.
+    return {
+      ...base, ...parsed,
+      company: { ...base.company, ...(parsed.company || {}) },
+      settings: {
+        ...base.settings, ...(parsed.settings || {}),
+        margins: { ...base.settings.margins, ...((parsed.settings || {}).margins || {}) }
+      },
+      equipment: Array.isArray(parsed.equipment) && parsed.equipment.length ? parsed.equipment : base.equipment,
+      labor: Array.isArray(parsed.labor) && parsed.labor.length ? parsed.labor : base.labor,
+      estimates: Array.isArray(parsed.estimates) ? parsed.estimates : []
+    };
+  } catch (err) {
+    console.warn("Could not read saved data, starting fresh.", err);
+    return freshState();
+  }
+}
+
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(S));
+    } catch (err) {
+      toast("Couldn't save — device storage may be full");
+      console.error(err);
+    }
+  }, 180);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Money & margin math
+
+   Gross margin, per the operator's choice:
+        price = cost / (1 - margin/100)
+   so a 30% margin means 30% of the invoice is profit.
+   ══════════════════════════════════════════════════════════════ */
+const MARGIN_CAP = 95;                       // keeps price finite if someone types 100
+const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function priceOf(cost, marginPct) {
+  const m = Math.min(Math.max(num(marginPct, 0), 0), MARGIN_CAP);
+  return cost / (1 - m / 100);
+}
+
+function marginFor(est, category, line) {
+  if (line && line.margin !== null && line.margin !== undefined && line.margin !== "") return num(line.margin);
+  if (est.margins && est.margins[category] !== undefined && est.margins[category] !== null) return num(est.margins[category]);
+  return num(S.settings.margins[category], 0);
+}
+
+function lineCost(category, line) {
+  switch (category) {
+    case "equipment":    return num(line.qty) * num(line.rate);
+    case "labor":        return num(line.hours) * num(line.rate)
+                              + num(line.otHours) * num(line.rate) * num(S.settings.otMultiplier, 1.5);
+    case "materials":    return num(line.qty) * num(line.rate);
+    case "mobilization": return num(line.qty) * num(line.rate);
+    case "lodging":      return num(line.qty) * num(line.nights) * num(line.rate);
+    default:             return 0;
+  }
+}
+
+function lineQty(category, line) {
+  switch (category) {
+    case "labor":   return num(line.hours) + num(line.otHours);
+    case "lodging": return num(line.qty) * num(line.nights);
+    default:        return num(line.qty);
+  }
+}
+
+function lineUnit(category, line) {
+  switch (category) {
+    case "labor":   return "hr";
+    case "lodging": return line.unit || "night";
+    default:        return line.unit || "";
+  }
+}
+
+/** Everything the rest of the app needs to know about an estimate's money. */
+function compute(est) {
+  const cats = {};
+  let lineCostTotal = 0, linePriceTotal = 0, taxablePrice = 0;
+
+  for (const { key } of CATEGORIES) {
+    const lines = est.lines[key] || [];
+    let c = 0, p = 0;
+    for (const ln of lines) {
+      const lc = lineCost(key, ln);
+      const lp = priceOf(lc, marginFor(est, key, ln));
+      c += lc; p += lp;
+      if (key === "materials" && ln.taxable) taxablePrice += lp;
+    }
+    cats[key] = { cost: c, price: p, count: lines.length };
+    lineCostTotal += c; linePriceTotal += p;
+  }
+
+  const contPct = num(est.contingencyPct, 0);
+  const contCost = lineCostTotal * (contPct / 100);
+  const contPrice = priceOf(contCost, marginFor(est, "contingency", null));
+
+  const subtotal = linePriceTotal + contPrice;
+  const tax = taxablePrice * (num(S.settings.taxRate, 0) / 100);
+  const total = subtotal + tax;
+  const totalCost = lineCostTotal + contCost;
+  const profit = subtotal - totalCost;
+  const effMargin = subtotal > 0 ? (profit / subtotal) * 100 : 0;
+
+  return { cats, lineCostTotal, linePriceTotal, contPct, contCost, contPrice, subtotal, tax, taxablePrice, total, totalCost, profit, effMargin };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Estimates
+   ══════════════════════════════════════════════════════════════ */
+function newEstimate() {
+  const est = {
+    id: uid(),
+    number: nextNumber(),
+    project: "",
+    client: { name: "", contact: "", phone: "", email: "", address: "" },
+    location: "",
+    date: new Date().toISOString().slice(0, 10),
+    scope: "",
+    lines: { equipment: [], labor: [], materials: [], mobilization: [], lodging: [] },
+    margins: {},
+    contingencyPct: 0,
+    detail: "detailed",
+    showQty: true,
+    terms: S.settings.terms,
+    exclusions: S.settings.exclusions,
+    notes: "",
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  S.estimates.unshift(est);
+  S.currentId = est.id;
+  save();
+  return est;
+}
+
+/* Estimate numbers read HJM-2026-001: prefix from the first word of the
+   company name, so "HJM Land Services" stays HJM rather than HJML. */
+function numberPrefix() {
+  const first = String(S.company.name || "").trim().split(/\s+/)[0] || "";
+  return first.replace(/[^A-Za-z0-9]/g, "").slice(0, 5).toUpperCase() || "HJM";
+}
+
+function nextNumber() {
+  return `${numberPrefix()}-${new Date().getFullYear()}-${String(S.seq++).padStart(3, "0")}`;
+}
+
+const current = () => S.estimates.find((e) => e.id === S.currentId) || null;
+const touch = () => { const e = current(); if (e) { e.updatedAt = Date.now(); } save(); };
+
+function newLine(category) {
+  switch (category) {
+    case "equipment":    return { id: uid(), equipId: "", desc: "", qty: 0, unit: "hr", rate: 0, margin: "" };
+    case "labor":        return { id: uid(), classId: "", desc: "", hours: 0, otHours: 0, rate: 0, margin: "" };
+    case "materials":    return { id: uid(), desc: "", qty: 0, unit: "each", rate: 0, margin: "", taxable: true };
+    case "mobilization": return { id: uid(), desc: "", qty: 0, unit: "load", rate: 0, margin: "" };
+    case "lodging":      return { id: uid(), desc: "", qty: 0, nights: 0, rate: 0, unit: "night", margin: "" };
+    default:             return { id: uid() };
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Views
+   ══════════════════════════════════════════════════════════════ */
+let view = "estimates";
+
+function setView(v) {
+  view = v;
+  $$(".tab").forEach((t) => t.setAttribute("aria-current", String(t.dataset.view === v)));
+  $$(".view").forEach((s) => { s.hidden = s.id !== `view-${v}`; });
+  if (v === "estimates") renderList();
+  if (v === "build")     renderBuild();
+  if (v === "quote")     renderQuote();
+  if (v === "rates")     renderRates();
+  if (v === "setup")     renderSetup();
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+}
+
+/* ── estimate list ── */
+function renderList() {
+  const host = $("#estList");
+  $("#estCount").textContent = S.estimates.length
+    ? `${S.estimates.length} estimate${S.estimates.length === 1 ? "" : "s"}`
+    : "";
+
+  const missing = missingRates();
+  $("#rateWarn").innerHTML = missing
+    ? `<div class="notice"><div><strong>${missing}</strong> — open <strong>Rates</strong> and enter your
+       hourly costs. Anything left at $0 prices at $0 and will quietly undercut the job.</div></div>`
+    : "";
+
+  if (!S.estimates.length) {
+    host.innerHTML = `<div class="lines-empty">No estimates yet. Start one with <strong>+ New estimate</strong>.</div>`;
+    return;
+  }
+
+  host.innerHTML = S.estimates.map((e) => {
+    const t = compute(e);
+    return `<button class="ecard" data-open="${e.id}">
+      <span class="ecard-t">
+        <span class="n">${esc(e.number)}</span>
+        <span class="p">${esc(e.project || "Untitled project")}</span>
+        <span class="c">${esc(e.client.name || "No client")}${e.location ? " · " + esc(e.location) : ""}</span>
+      </span>
+      <span class="ecard-n">
+        <span class="amt">${money0.format(t.total)}</span><br />
+        <span class="sub">${t.effMargin.toFixed(1)}% margin · ${money0.format(t.profit)} profit</span>
+      </span>
+      <span class="ecard-acts btn-row">
+        <span class="btn ghost sm" data-dup="${e.id}" role="button" tabindex="0">Copy</span>
+        <span class="icon-btn" data-del="${e.id}" role="button" tabindex="0" title="Delete estimate">&times;</span>
+      </span>
+    </button>`;
+  }).join("");
+}
+
+function missingRates() {
+  const eq = S.equipment.filter((x) => num(x.cost) <= 0).length;
+  const lb = S.labor.filter((x) => num(x.cost) <= 0).length;
+  if (!eq && !lb) return "";
+  const bits = [];
+  if (eq) bits.push(`${eq} machine${eq === 1 ? "" : "s"}`);
+  if (lb) bits.push(`${lb} labor class${lb === 1 ? "" : "es"}`);
+  return `${bits.join(" and ")} still at $0`;
+}
+
+/* ── build ── */
+function renderBuild() {
+  const est = current();
+  const host = $("#buildBody");
+  if (!est) {
+    host.innerHTML = `<div class="panel"><div class="panel-body">
+      <p class="subtle">No estimate open.</p>
+      <button class="btn" id="newFromBuild">+ New estimate</button></div></div>`;
+    $("#newFromBuild").onclick = () => { newEstimate(); renderBuild(); };
+    return;
+  }
+
+  host.innerHTML = `
+    <div class="toolbar">
+      <div class="seg">
+        <button aria-pressed="true" style="pointer-events:none">${esc(est.number)}</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn ghost sm" id="toQuote">View quote &rarr;</button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="eyebrow">Job ticket</span><h2>Project &amp; client</h2></div>
+      <div class="panel-body">
+        <div class="grid g3">
+          <div class="field"><label>Estimate #</label><input type="text" data-e="number" value="${esc(est.number)}" /></div>
+          <div class="field"><label>Date</label><input type="date" data-e="date" value="${esc(est.date)}" /></div>
+          <div class="field"><label>Job / project name</label><input type="text" data-e="project" value="${esc(est.project)}" placeholder="e.g. Hwy 27 ROW clearing" /></div>
+        </div>
+        <div class="grid g3 mt4">
+          <div class="field"><label>Client</label><input type="text" data-c="name" value="${esc(est.client.name)}" /></div>
+          <div class="field"><label>Attention / contact</label><input type="text" data-c="contact" value="${esc(est.client.contact)}" /></div>
+          <div class="field"><label>Client phone</label><input type="text" data-c="phone" value="${esc(est.client.phone)}" /></div>
+        </div>
+        <div class="grid g2 mt4">
+          <div class="field"><label>Client address</label><textarea data-c="address">${esc(est.client.address)}</textarea></div>
+          <div class="field"><label>Job location</label><textarea data-e="location" placeholder="County road, tract, acreage">${esc(est.location)}</textarea></div>
+        </div>
+        <div class="grid mt4">
+          <div class="field"><label>Scope of work</label>
+            <textarea data-e="scope" rows="4" placeholder="Describe the work as the client should read it on the quote.">${esc(est.scope)}</textarea></div>
+        </div>
+      </div>
+    </div>
+
+    ${CATEGORIES.map((c) => sectionHtml(est, c)).join("")}
+
+    <div class="panel">
+      <div class="panel-head"><span class="eyebrow">Adjustments</span><h2>Contingency, margins &amp; terms</h2></div>
+      <div class="panel-body">
+        <div class="grid g3">
+          <div class="field">
+            <label>Contingency (% of cost)</label>
+            <input type="number" step="0.5" min="0" data-e="contingencyPct" value="${esc(est.contingencyPct)}" />
+          </div>
+          <div class="field">
+            <label>Contingency margin (%)</label>
+            <input type="number" step="0.5" min="0" data-m="contingency" value="${esc(est.margins.contingency ?? "")}" placeholder="${esc(S.settings.margins.contingency)} default" />
+          </div>
+          <div class="field">
+            <label>Tax on materials (%)</label>
+            <input type="number" step="0.001" min="0" id="estTax" value="${esc(S.settings.taxRate)}" />
+          </div>
+        </div>
+        <div class="divider"></div>
+        <p class="eyebrow">Margin override for this job</p>
+        <p class="subtle" style="margin:6px 0 12px">Leave blank to use your defaults from the Rates screen.</p>
+        <div class="grid g4">
+          ${CATEGORIES.map((c) => `<div class="field">
+            <label>${esc(c.label)}</label>
+            <input type="number" step="0.5" min="0" max="95" data-m="${c.key}"
+              value="${esc(est.margins[c.key] ?? "")}" placeholder="${esc(S.settings.margins[c.key])} default" />
+          </div>`).join("")}
+        </div>
+        <div class="divider"></div>
+        <div class="grid g2">
+          <div class="field"><label>Terms</label><textarea data-e="terms" rows="6">${esc(est.terms)}</textarea></div>
+          <div class="field"><label>Exclusions</label><textarea data-e="exclusions" rows="6">${esc(est.exclusions)}</textarea></div>
+        </div>
+        <div class="grid mt4">
+          <div class="field"><label>Internal notes (never printed)</label><textarea data-e="notes" rows="3">${esc(est.notes)}</textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="totalbar"><div class="totalbar-in" id="totalbar"></div></div>
+  `;
+
+  updateTotals();
+}
+
+function sectionHtml(est, cat) {
+  const lines = est.lines[cat.key] || [];
+  return `<div class="panel" data-section="${cat.key}">
+    <div class="panel-head">
+      <span class="eyebrow">${esc(cat.eyebrow)}</span>
+      <h2>${esc(cat.label)}</h2>
+      <span class="hint">margin ${esc(marginFor(est, cat.key, null))}%</span>
+    </div>
+    <div class="panel-body flush">
+      ${headRow(cat.key)}
+      <div class="lines" data-lines="${cat.key}">
+        ${lines.length ? lines.map((ln) => rowHtml(est, cat.key, ln)).join("")
+                       : `<div class="lines-empty">No ${cat.label.toLowerCase()} lines yet.</div>`}
+      </div>
+      <div class="lines-foot">
+        <button class="btn ghost sm" data-add="${cat.key}">+ Add ${addLabel(cat.key)}</button>
+        ${cat.key === "equipment" ? `<span class="subtle">Rate autofills from your machine rates — override it per job if you need to.</span>` : ""}
+        ${cat.key === "lodging" ? `<span class="subtle">Rooms &times; nights, or men &times; days for per diem.</span>` : ""}
+      </div>
+      <div class="cat-tot" data-cattot="${cat.key}"></div>
+    </div>
+  </div>`;
+}
+
+function addLabel(key) {
+  return { equipment: "machine", labor: "crew", materials: "material", mobilization: "move", lodging: "line" }[key];
+}
+
+function headRow(key) {
+  const cols = {
+    equipment:    ["Equipment", "Qty", "Unit", "Cost / unit", "Margin %", "Price", ""],
+    labor:        ["Labor class", "Hours", "OT hrs", "Cost / hr", "Margin %", "Price", ""],
+    materials:    ["Material", "Qty", "Unit", "Unit cost", "Margin %", "Price", ""],
+    mobilization: ["Description", "Qty", "Unit", "Rate", "Margin %", "Price", ""],
+    lodging:      ["Description", "Units", "Nights", "Rate", "Margin %", "Price", ""]
+  }[key];
+  const tpl = { equipment: "tpl-equip", labor: "tpl-labor", materials: "tpl-mat", mobilization: "tpl-mob", lodging: "tpl-lodge" }[key];
+  return `<div class="lrow head ${tpl}">${cols.map((c, i) =>
+    `<span class="${i >= 1 && i <= 5 ? "ta-r" : ""}">${esc(c)}</span>`).join("")}</div>`;
+}
+
+function rowHtml(est, key, ln) {
+  const c = lineCost(key, ln);
+  const p = priceOf(c, marginFor(est, key, ln));
+  const mph = esc(marginFor(est, key, null));
+  const out = `<span class="lrow-out price" data-out="${ln.id}" data-label="Price">${money.format(p)}</span>
+    <span class="icon-btn del" data-del-line="${key}:${ln.id}" role="button" tabindex="0" title="Remove line">&times;</span>`;
+
+  if (key === "equipment") {
+    return `<div class="lrow tpl-equip" data-row="${ln.id}">
+      <span class="cell-wide">
+        <select data-l="${key}:${ln.id}:equipId">
+          <option value="">— pick equipment —</option>
+          ${S.equipment.map((eq) => `<option value="${eq.id}"${eq.id === ln.equipId ? " selected" : ""}>${esc(eq.code)} · ${esc(eq.name)}</option>`).join("")}
+          <option value="__custom"${ln.equipId === "__custom" ? " selected" : ""}>Other / custom…</option>
+        </select>
+        ${ln.equipId === "__custom" ? `<input type="text" class="mt4" data-l="${key}:${ln.id}:desc" value="${esc(ln.desc)}" placeholder="Describe the machine" />` : ""}
+      </span>
+      <span data-label="Qty"><input type="number" step="0.25" min="0" data-l="${key}:${ln.id}:qty" value="${esc(ln.qty)}" /></span>
+      <span data-label="Unit"><select data-l="${key}:${ln.id}:unit">${UNITS.map((u) => `<option${u === ln.unit ? " selected" : ""}>${u}</option>`).join("")}</select></span>
+      <span data-label="Cost / unit"><input type="number" step="0.01" min="0" data-l="${key}:${ln.id}:rate" value="${esc(ln.rate)}" /></span>
+      <span data-label="Margin %"><input type="number" step="0.5" min="0" max="95" data-l="${key}:${ln.id}:margin" value="${esc(ln.margin)}" placeholder="${mph}" /></span>
+      ${out}
+    </div>`;
+  }
+
+  if (key === "labor") {
+    return `<div class="lrow tpl-labor" data-row="${ln.id}">
+      <span class="cell-wide">
+        <select data-l="${key}:${ln.id}:classId">
+          <option value="">— pick class —</option>
+          ${S.labor.map((lc) => `<option value="${lc.id}"${lc.id === ln.classId ? " selected" : ""}>${esc(lc.code)} · ${esc(lc.name)}</option>`).join("")}
+          <option value="__custom"${ln.classId === "__custom" ? " selected" : ""}>Other / custom…</option>
+        </select>
+        ${ln.classId === "__custom" ? `<input type="text" class="mt4" data-l="${key}:${ln.id}:desc" value="${esc(ln.desc)}" placeholder="Describe the labor" />` : ""}
+      </span>
+      <span data-label="Hours"><input type="number" step="0.25" min="0" data-l="${key}:${ln.id}:hours" value="${esc(ln.hours)}" /></span>
+      <span data-label="OT hrs"><input type="number" step="0.25" min="0" data-l="${key}:${ln.id}:otHours" value="${esc(ln.otHours)}" /></span>
+      <span data-label="Cost / hr"><input type="number" step="0.01" min="0" data-l="${key}:${ln.id}:rate" value="${esc(ln.rate)}" /></span>
+      <span data-label="Margin %"><input type="number" step="0.5" min="0" max="95" data-l="${key}:${ln.id}:margin" value="${esc(ln.margin)}" placeholder="${mph}" /></span>
+      ${out}
+    </div>`;
+  }
+
+  if (key === "materials") {
+    return `<div class="lrow tpl-mat" data-row="${ln.id}">
+      <span class="cell-wide"><input type="text" data-l="${key}:${ln.id}:desc" value="${esc(ln.desc)}" placeholder="e.g. #57 stone, culvert pipe, seed" /></span>
+      <span data-label="Qty"><input type="number" step="0.01" min="0" data-l="${key}:${ln.id}:qty" value="${esc(ln.qty)}" /></span>
+      <span data-label="Unit"><select data-l="${key}:${ln.id}:unit">${MAT_UNITS.map((u) => `<option${u === ln.unit ? " selected" : ""}>${u}</option>`).join("")}</select></span>
+      <span data-label="Unit cost"><input type="number" step="0.01" min="0" data-l="${key}:${ln.id}:rate" value="${esc(ln.rate)}" /></span>
+      <span data-label="Margin %"><input type="number" step="0.5" min="0" max="95" data-l="${key}:${ln.id}:margin" value="${esc(ln.margin)}" placeholder="${mph}" /></span>
+      ${out}
+    </div>`;
+  }
+
+  if (key === "mobilization") {
+    return `<div class="lrow tpl-mob" data-row="${ln.id}">
+      <span class="cell-wide"><input type="text" data-l="${key}:${ln.id}:desc" value="${esc(ln.desc)}" placeholder="e.g. Lowboy move in — dozer + cutter" /></span>
+      <span data-label="Qty"><input type="number" step="0.5" min="0" data-l="${key}:${ln.id}:qty" value="${esc(ln.qty)}" /></span>
+      <span data-label="Unit"><select data-l="${key}:${ln.id}:unit">${MOB_UNITS.map((u) => `<option${u === ln.unit ? " selected" : ""}>${u}</option>`).join("")}</select></span>
+      <span data-label="Rate"><input type="number" step="0.01" min="0" data-l="${key}:${ln.id}:rate" value="${esc(ln.rate)}" /></span>
+      <span data-label="Margin %"><input type="number" step="0.5" min="0" max="95" data-l="${key}:${ln.id}:margin" value="${esc(ln.margin)}" placeholder="${mph}" /></span>
+      ${out}
+    </div>`;
+  }
+
+  return `<div class="lrow tpl-lodge" data-row="${ln.id}">
+    <span class="cell-wide"><input type="text" data-l="${key}:${ln.id}:desc" value="${esc(ln.desc)}" placeholder="e.g. 3 rooms, or per diem — 6 men" /></span>
+    <span data-label="Units"><input type="number" step="1" min="0" data-l="${key}:${ln.id}:qty" value="${esc(ln.qty)}" /></span>
+    <span data-label="Nights"><input type="number" step="1" min="0" data-l="${key}:${ln.id}:nights" value="${esc(ln.nights)}" /></span>
+    <span data-label="Rate"><input type="number" step="0.01" min="0" data-l="${key}:${ln.id}:rate" value="${esc(ln.rate)}" /></span>
+    <span data-label="Margin %"><input type="number" step="0.5" min="0" max="95" data-l="${key}:${ln.id}:margin" value="${esc(ln.margin)}" placeholder="${mph}" /></span>
+    ${out}
+  </div>`;
+}
+
+/* Inputs mutate state and refresh only the numbers, so typing never
+   loses focus. Structural changes (add/remove/picker) re-render.
+
+   Bound exactly once against the persistent #buildBody host: renderBuild()
+   only swaps innerHTML, so re-binding here would stack a second copy of every
+   listener on each render and make one click add several lines. */
+function initBuildEvents() {
+  const host = $("#buildBody");
+
+  host.addEventListener("input", (ev) => {
+    const est = current();
+    if (!est) return;
+    const t = ev.target;
+    if (t.dataset.e !== undefined) {
+      est[t.dataset.e] = t.type === "number" ? num(t.value) : t.value;
+      touch(); updateTotals(); return;
+    }
+    if (t.dataset.c !== undefined) { est.client[t.dataset.c] = t.value; touch(); return; }
+    if (t.dataset.m !== undefined) {
+      est.margins[t.dataset.m] = t.value === "" ? undefined : num(t.value);
+      if (t.value === "") delete est.margins[t.dataset.m];
+      touch(); updateTotals(); refreshHints(est); return;
+    }
+    if (t.id === "estTax") { S.settings.taxRate = num(t.value); save(); updateTotals(); return; }
+    if (t.dataset.l !== undefined) {
+      const [key, id, field] = t.dataset.l.split(":");
+      const ln = (est.lines[key] || []).find((x) => x.id === id);
+      if (!ln) return;
+      if (field === "margin") ln.margin = t.value === "" ? "" : num(t.value);
+      else if (t.type === "number") ln[field] = num(t.value);
+      else ln[field] = t.value;
+      touch(); updateRowOut(est, key, ln); updateTotals();
+    }
+  });
+
+  host.addEventListener("change", (ev) => {
+    const est = current();
+    if (!est) return;
+    const t = ev.target;
+    if (t.tagName !== "SELECT" || t.dataset.l === undefined) return;
+    const [key, id, field] = t.dataset.l.split(":");
+    const ln = (est.lines[key] || []).find((x) => x.id === id);
+    if (!ln) return;
+    ln[field] = t.value;
+
+    // Picking a machine or a class pulls its rate in.
+    if (field === "equipId" && t.value && t.value !== "__custom") {
+      const eq = S.equipment.find((x) => x.id === t.value);
+      if (eq) { ln.rate = num(eq.cost); ln.unit = eq.unit || "hr"; ln.desc = `${eq.code} · ${eq.name}`; }
+    }
+    if (field === "classId" && t.value && t.value !== "__custom") {
+      const lc = S.labor.find((x) => x.id === t.value);
+      if (lc) { ln.rate = num(lc.cost); ln.desc = lc.name; }
+    }
+    touch();
+    if (field === "equipId" || field === "classId") renderBuild();
+    else { updateRowOut(est, key, ln); updateTotals(); }
+  });
+
+  host.addEventListener("click", (ev) => {
+    const est = current();
+    if (!est) return;
+    const add = ev.target.closest("[data-add]");
+    if (add) {
+      const key = add.dataset.add;
+      est.lines[key] = est.lines[key] || [];
+      est.lines[key].push(newLine(key));
+      touch(); renderBuild();
+      const rows = $$(`[data-lines="${key}"] .lrow`);
+      const last = rows[rows.length - 1];
+      if (last) { const f = last.querySelector("select,input"); if (f) f.focus(); }
+      return;
+    }
+    const del = ev.target.closest("[data-del-line]");
+    if (del) {
+      const [key, id] = del.dataset.delLine.split(":");
+      est.lines[key] = (est.lines[key] || []).filter((x) => x.id !== id);
+      touch(); renderBuild(); return;
+    }
+    if (ev.target.closest("#toQuote")) setView("quote");
+  });
+}
+
+function refreshHints(est) {
+  $$("[data-section]").forEach((sec) => {
+    const hint = sec.querySelector(".panel-head .hint");
+    if (hint) hint.textContent = `margin ${marginFor(est, sec.dataset.section, null)}%`;
+  });
+  $$("[data-l$=':margin']").forEach((inp) => {
+    const key = inp.dataset.l.split(":")[0];
+    inp.placeholder = String(marginFor(est, key, null));
+  });
+}
+
+function updateRowOut(est, key, ln) {
+  const el = $(`[data-out="${ln.id}"]`);
+  if (el) el.textContent = money.format(priceOf(lineCost(key, ln), marginFor(est, key, ln)));
+}
+
+function updateTotals() {
+  const est = current();
+  if (!est) return;
+  const t = compute(est);
+
+  for (const { key, label } of CATEGORIES) {
+    const el = $(`[data-cattot="${key}"]`);
+    if (!el) continue;
+    const c = t.cats[key];
+    el.innerHTML = c.count
+      ? `<span><span class="k">${esc(label)} cost</span> <span class="v">${money.format(c.cost)}</span></span>
+         <span><span class="k">Price</span> <span class="v">${money.format(c.price)}</span></span>`
+      : "";
+  }
+
+  const bar = $("#totalbar");
+  if (!bar) return;
+  const marginBad = t.effMargin < 10 && t.subtotal > 0;
+  bar.innerHTML = `
+    <span class="tstat"><span class="k">Your cost</span><span class="v">${money0.format(t.totalCost)}</span></span>
+    <span class="tstat profit"><span class="k">Profit</span><span class="v">${money0.format(t.profit)}</span></span>
+    <span class="tstat margin"><span class="k">Margin</span><span class="v${marginBad ? " bad" : ""}">${t.effMargin.toFixed(1)}%</span></span>
+    <span class="tstat total"><span class="k">Quote total</span><span class="v">${money.format(t.total)}</span></span>
+    <span class="btn-row">
+      <button class="btn ghost" data-act="save">Saved &check;</button>
+      <button class="btn" data-act="quote">Quote &rarr;</button>
+    </span>`;
+  bar.querySelector('[data-act="quote"]').onclick = () => setView("quote");
+  bar.querySelector('[data-act="save"]').onclick = () => { save(); toast("Saved to this device"); };
+}
+
+/* ── quote ── */
+function renderQuote() {
+  const est = current();
+  const paper = $("#quotePaper");
+  if (!est) {
+    paper.innerHTML = `<p class="subtle" style="font-family:var(--sans)">No estimate open. Start one on the Estimates screen.</p>`;
+    return;
+  }
+
+  $$("#detailSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.detail === (est.detail || "detailed"))));
+  $("#qShowQty").checked = est.showQty !== false;
+
+  const t = compute(est);
+  const co = S.company;
+  const dt = est.date ? new Date(est.date + "T12:00:00") : new Date();
+  const fmtDate = (d) => d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const good = new Date(dt.getTime() + num(S.settings.validDays, 30) * 864e5);
+  const showQty = est.showQty !== false;
+  const detail = est.detail || "detailed";
+
+  const coMeta = [co.address, co.phone, co.email, co.license ? "License " + co.license : ""]
+    .filter(Boolean).join("\n");
+  const clientBlock = [
+    est.client.name ? `<strong>${esc(est.client.name)}</strong>` : "",
+    est.client.contact ? "Attn: " + esc(est.client.contact) : "",
+    esc(est.client.address || ""),
+    esc(est.client.phone || ""),
+    esc(est.client.email || "")
+  ].filter(Boolean).join("\n");
+
+  let body = "";
+  if (detail === "lump") {
+    body = `<table class="q-tbl"><thead><tr><th>Description</th><th class="r">Amount</th></tr></thead><tbody>
+      <tr><td>${esc(est.project || "Work as described above")} — complete, lump sum</td>
+      <td class="n r">${money.format(t.subtotal)}</td></tr></tbody></table>`;
+  } else if (detail === "category") {
+    const rows = CATEGORIES.filter((c) => t.cats[c.key].count && t.cats[c.key].price > 0)
+      .map((c) => `<tr><td>${esc(c.label)}</td><td class="n r">${money.format(t.cats[c.key].price)}</td></tr>`).join("");
+    body = `<table class="q-tbl"><thead><tr><th>Description</th><th class="r">Amount</th></tr></thead><tbody>
+      ${rows || `<tr><td colspan="2">No priced lines.</td></tr>`}
+      ${t.contPrice > 0 ? `<tr><td>Contingency</td><td class="n r">${money.format(t.contPrice)}</td></tr>` : ""}
+      </tbody></table>`;
+  } else {
+    const head = showQty
+      ? `<tr><th>Description</th><th class="r">Qty</th><th>Unit</th><th class="r">Unit price</th><th class="r">Amount</th></tr>`
+      : `<tr><th>Description</th><th class="r">Amount</th></tr>`;
+    const span = showQty ? 5 : 2;
+    let rows = "";
+    for (const c of CATEGORIES) {
+      const lines = (est.lines[c.key] || []).filter((ln) => lineCost(c.key, ln) > 0 || lineQty(c.key, ln) > 0);
+      if (!lines.length) continue;
+      rows += `<tr class="grp"><td colspan="${span}">${esc(c.label)}</td></tr>`;
+      for (const ln of lines) {
+        const cost = lineCost(c.key, ln);
+        const price = priceOf(cost, marginFor(est, c.key, ln));
+        const q = lineQty(c.key, ln);
+        const unitPrice = q > 0 ? price / q : price;
+        const desc = esc(ln.desc || describeLine(c.key, ln) || c.label);
+        rows += showQty
+          ? `<tr><td>${desc}</td><td class="n r">${fmtQty(q)}</td><td class="n">${esc(lineUnit(c.key, ln))}</td>
+             <td class="n r">${money.format(unitPrice)}</td><td class="n r">${money.format(price)}</td></tr>`
+          : `<tr><td>${desc}</td><td class="n r">${money.format(price)}</td></tr>`;
+      }
+      if (lines.length > 1) {
+        rows += showQty
+          ? `<tr class="sub"><td colspan="4" class="r">${esc(c.label)} subtotal</td><td class="n r">${money.format(t.cats[c.key].price)}</td></tr>`
+          : `<tr class="sub"><td class="r">${esc(c.label)} subtotal</td><td class="n r">${money.format(t.cats[c.key].price)}</td></tr>`;
+      }
+    }
+    if (t.contPrice > 0) {
+      rows += `<tr class="grp"><td colspan="${span}">Contingency</td></tr>` + (showQty
+        ? `<tr><td>Allowance for unforeseen conditions (${t.contPct}%)</td><td class="n r"></td><td></td><td class="n r"></td><td class="n r">${money.format(t.contPrice)}</td></tr>`
+        : `<tr><td>Allowance for unforeseen conditions (${t.contPct}%)</td><td class="n r">${money.format(t.contPrice)}</td></tr>`);
+    }
+    body = `<table class="q-tbl"><thead>${head}</thead><tbody>${rows || `<tr><td colspan="${span}">No priced lines yet.</td></tr>`}</tbody></table>`;
+  }
+
+  paper.innerHTML = `
+    <div class="q-head">
+      <div class="q-co">
+        ${co.logo ? `<img class="q-logo" src="${esc(co.logo)}" alt="" />`
+                  : `<div class="q-co-name">${esc(co.name || "Your Company")}</div>`}
+        ${coMeta ? `<div class="q-co-meta">${esc(coMeta)}</div>` : ""}
+      </div>
+      <div class="q-title">
+        <div class="w">Estimate</div>
+        <div class="no">${esc(est.number)}</div>
+        <div class="dt">${esc(fmtDate(dt))}</div>
+      </div>
+    </div>
+
+    <div class="q-meta">
+      <div class="q-block"><div class="lbl">Prepared for</div><div class="val">${clientBlock || "—"}</div></div>
+      <div class="q-block"><div class="lbl">Project</div><div class="val">${
+        [est.project ? `<strong>${esc(est.project)}</strong>` : "", esc(est.location || "")].filter(Boolean).join("\n") || "—"
+      }</div></div>
+    </div>
+
+    ${est.scope ? `<div class="q-scope"><div class="q-block"><div class="lbl">Scope of work</div></div><p>${esc(est.scope)}</p></div>` : ""}
+
+    <div class="q-scroll">${body}</div>
+
+    <div class="q-tot"><table>
+      ${t.tax > 0 ? `<tr><td>Subtotal</td><td class="n">${money.format(t.subtotal)}</td></tr>
+                     <tr><td>Sales tax on materials (${num(S.settings.taxRate)}%)</td><td class="n">${money.format(t.tax)}</td></tr>` : ""}
+      <tr class="grand"><td>Total estimate</td><td class="n">${money.format(t.total)}</td></tr>
+    </table></div>
+
+    <div class="q-terms">
+      <div class="lbl">Validity</div>
+      <p>This estimate is good through ${esc(fmtDate(good))} (${esc(num(S.settings.validDays, 30))} days).</p>
+      ${est.terms ? `<div class="lbl">Terms</div><p>${esc(est.terms)}</p>` : ""}
+      ${est.exclusions ? `<div class="lbl">Not included</div><p>${esc(est.exclusions)}</p>` : ""}
+    </div>
+
+    <div class="q-sign">
+      <div><div class="ln"></div><div class="cap">Accepted by — client signature &amp; date</div></div>
+      <div><div class="ln"></div><div class="cap">${esc(co.name || "Contractor")} — authorized signature</div></div>
+    </div>
+
+    <div class="q-foot">${esc(co.name || "")} · Estimate ${esc(est.number)} · ${esc(fmtDate(dt))}</div>
+  `;
+}
+
+function describeLine(key, ln) {
+  if (key === "equipment" && ln.equipId && ln.equipId !== "__custom") {
+    const eq = S.equipment.find((x) => x.id === ln.equipId);
+    if (eq) return `${eq.code} · ${eq.name}`;
+  }
+  if (key === "labor" && ln.classId && ln.classId !== "__custom") {
+    const lc = S.labor.find((x) => x.id === ln.classId);
+    if (lc) return lc.name;
+  }
+  return "";
+}
+
+function fmtQty(q) {
+  if (!Number.isFinite(q)) return "";
+  return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, "");
+}
+
+/* ── rates ── */
+function renderRates() {
+  $("#marginFields").innerHTML = [...CATEGORIES, { key: "contingency", label: "Contingency" }]
+    .map((c) => `<div class="field">
+      <label for="mg-${c.key}">${esc(c.label)} margin (%)</label>
+      <input type="number" id="mg-${c.key}" data-mg="${c.key}" step="0.5" min="0" max="95" value="${esc(S.settings.margins[c.key])}" />
+    </div>`).join("");
+  $$("[data-mg]").forEach((inp) => {
+    inp.oninput = () => { S.settings.margins[inp.dataset.mg] = num(inp.value); save(); };
+  });
+
+  $("#setOt").value = S.settings.otMultiplier;
+  $("#setTax").value = S.settings.taxRate;
+  $("#setValid").value = S.settings.validDays;
+  $("#setOt").oninput = (e) => { S.settings.otMultiplier = num(e.target.value, 1.5); save(); };
+  $("#setTax").oninput = (e) => { S.settings.taxRate = num(e.target.value); save(); };
+  $("#setValid").oninput = (e) => { S.settings.validDays = num(e.target.value, 30); save(); };
+
+  renderLaborRates();
+  renderEquipCats();
+  renderEquipRates();
+
+  const missing = missingRates();
+  $("#ratesNotice").innerHTML = `<div><strong>Enter your rates once.</strong> These are your
+    <em>costs</em> — what the machine or the man actually costs you per hour, including fuel, wear,
+    and burden. Margin is added on top at estimate time, so don't build profit into these numbers.
+    ${missing ? `<br /><span class="flag no-rate" style="margin-top:8px">${esc(missing)}</span>` : ""}</div>`;
+}
+
+function renderLaborRates() {
+  const host = $("#laborRates");
+  host.innerHTML = S.labor.map((lc) => `<div class="rate-row">
+    <span><input type="text" class="code-chip" style="padding:5px" data-lb="${lc.id}:code" value="${esc(lc.code)}" /></span>
+    <span class="rname"><input type="text" data-lb="${lc.id}:name" value="${esc(lc.name)}" /></span>
+    <span data-label="Cost / hr"><input type="number" step="0.01" min="0" data-lb="${lc.id}:cost" value="${esc(lc.cost)}" /></span>
+    <span>${num(lc.cost) > 0 ? `<span class="flag ok">set</span>` : `<span class="flag no-rate">$0</span>`}</span>
+    <span></span>
+    <span class="icon-btn del" data-del-lb="${lc.id}" role="button" tabindex="0" title="Remove class">&times;</span>
+  </div>`).join("");
+
+  host.oninput = (ev) => {
+    const t = ev.target;
+    if (t.dataset.lb === undefined) return;
+    const [id, field] = t.dataset.lb.split(":");
+    const lc = S.labor.find((x) => x.id === id);
+    if (!lc) return;
+    lc[field] = t.type === "number" ? num(t.value) : t.value;
+    save();
+    if (field === "cost") {
+      const flag = t.closest(".rate-row").querySelector(".flag");
+      if (flag) {
+        flag.className = num(t.value) > 0 ? "flag ok" : "flag no-rate";
+        flag.textContent = num(t.value) > 0 ? "set" : "$0";
+      }
+    }
+  };
+  host.onclick = (ev) => {
+    const d = ev.target.closest("[data-del-lb]");
+    if (!d) return;
+    if (!confirm("Remove this labor class? Estimate lines already using it keep their rate.")) return;
+    S.labor = S.labor.filter((x) => x.id !== d.dataset.delLb);
+    save(); renderLaborRates();
+  };
+  $("#addLabor").onclick = () => {
+    S.labor.push({ id: uid(), code: "NEW", name: "New class", cost: 0 });
+    save(); renderLaborRates();
+  };
+}
+
+let equipFilter = { q: "", cat: "" };
+
+function renderEquipCats() {
+  const cats = Array.from(new Set(S.equipment.map((e) => e.category).filter(Boolean))).sort();
+  const sel = $("#equipCat");
+  sel.innerHTML = `<option value="">All categories</option>` +
+    cats.map((c) => `<option value="${esc(c)}"${c === equipFilter.cat ? " selected" : ""}>${esc(c)}</option>`).join("");
+  sel.onchange = () => { equipFilter.cat = sel.value; renderEquipRates(); };
+  const q = $("#equipSearch");
+  q.value = equipFilter.q;
+  q.oninput = () => { equipFilter.q = q.value; renderEquipRates(); };
+}
+
+function renderEquipRates() {
+  const host = $("#equipRates");
+  const needle = equipFilter.q.trim().toLowerCase();
+  const shown = S.equipment.filter((e) => {
+    if (equipFilter.cat && e.category !== equipFilter.cat) return false;
+    if (!needle) return true;
+    return (e.code + " " + e.name + " " + e.category).toLowerCase().includes(needle);
+  });
+
+  const zero = S.equipment.filter((e) => num(e.cost) <= 0).length;
+  $("#equipCount").textContent =
+    `${S.equipment.length} machines · ${zero} still at $0${shown.length !== S.equipment.length ? ` · showing ${shown.length}` : ""}`;
+
+  host.innerHTML = shown.length ? shown.map((e) => `<div class="rate-row">
+    <span><input type="text" class="code-chip" style="padding:5px" data-eq="${e.id}:code" value="${esc(e.code)}" /></span>
+    <span class="rname"><input type="text" data-eq="${e.id}:name" value="${esc(e.name)}" /></span>
+    <span data-label="Cost / unit"><input type="number" step="0.01" min="0" data-eq="${e.id}:cost" value="${esc(e.cost)}" /></span>
+    <span data-label="Unit"><select data-eq="${e.id}:unit">${UNITS.map((u) => `<option${u === e.unit ? " selected" : ""}>${u}</option>`).join("")}</select></span>
+    <span data-label="Category"><input type="text" data-eq="${e.id}:category" value="${esc(e.category)}" /></span>
+    <span class="icon-btn del" data-del-eq="${e.id}" role="button" tabindex="0" title="Remove equipment">&times;</span>
+  </div>`).join("") : `<div class="lines-empty">Nothing matches that filter.</div>`;
+
+  host.oninput = (ev) => {
+    const t = ev.target;
+    if (t.dataset.eq === undefined) return;
+    const [id, field] = t.dataset.eq.split(":");
+    const eq = S.equipment.find((x) => x.id === id);
+    if (!eq) return;
+    eq[field] = t.type === "number" ? num(t.value) : t.value;
+    save();
+    if (field === "cost") {
+      const zeroNow = S.equipment.filter((x) => num(x.cost) <= 0).length;
+      $("#equipCount").textContent = `${S.equipment.length} machines · ${zeroNow} still at $0`;
+    }
+  };
+  host.onchange = host.oninput;
+  host.onclick = (ev) => {
+    const d = ev.target.closest("[data-del-eq]");
+    if (!d) return;
+    if (!confirm("Remove this machine from your rate list?")) return;
+    S.equipment = S.equipment.filter((x) => x.id !== d.dataset.delEq);
+    save(); renderEquipCats(); renderEquipRates();
+  };
+  $("#addEquip").onclick = () => {
+    S.equipment.push({ id: uid(), code: "NEW", name: "New equipment", category: "Other", unit: "hr", cost: 0 });
+    equipFilter = { q: "", cat: "" };
+    save(); renderEquipCats(); renderEquipRates();
+  };
+}
+
+/* ── setup ── */
+function renderSetup() {
+  const map = { coName: "name", coPhone: "phone", coEmail: "email", coLicense: "license", coAddress: "address" };
+  for (const [el, key] of Object.entries(map)) {
+    const node = $("#" + el);
+    node.value = S.company[key] || "";
+    node.oninput = () => {
+      S.company[key] = node.value;
+      if (key === "name") applyBrand();
+      save();
+    };
+  }
+  $("#setTerms").value = S.settings.terms;
+  $("#setExcl").value = S.settings.exclusions;
+  $("#setTerms").oninput = (e) => { S.settings.terms = e.target.value; save(); };
+  $("#setExcl").oninput = (e) => { S.settings.exclusions = e.target.value; save(); };
+
+  const prev = $("#logoPreview");
+  prev.innerHTML = S.company.logo
+    ? `<img src="${esc(S.company.logo)}" alt="Current logo" style="max-height:70px;max-width:220px;object-fit:contain" />
+       <div class="mt4"><button class="btn ghost sm" id="rmLogo">Remove logo</button></div>`
+    : `<span class="subtle">No logo — the quote prints your company name as the letterhead.</span>`;
+  const rm = $("#rmLogo");
+  if (rm) rm.onclick = () => { S.company.logo = ""; save(); renderSetup(); };
+
+  $("#coLogo").onchange = (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    if (f.size > 900 * 1024) { toast("Logo too large — use one under 900 KB"); return; }
+    const r = new FileReader();
+    r.onload = () => { S.company.logo = String(r.result); save(); renderSetup(); toast("Logo saved"); };
+    r.readAsDataURL(f);
+  };
+}
+
+function applyBrand() {
+  const n = S.company.name || "HJM";
+  $("#brandName").textContent = n;
+  $("#brandMark").textContent = n.replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "HJM";
+}
+
+/* ── backup ── */
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `estimator-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast("Backup downloaded");
+}
+
+function importBackup() { $("#fileIn").click(); }
+
+$("#fileIn").onchange = (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const data = JSON.parse(String(r.result));
+      if (!data || typeof data !== "object" || !Array.isArray(data.equipment)) {
+        toast("That file isn't an estimator backup"); return;
+      }
+      if (!confirm("Replace everything on this device with the backup file?")) return;
+      localStorage.setItem(KEY, JSON.stringify(data));
+      S = load();
+      applyBrand(); setView("estimates");
+      toast("Backup loaded");
+    } catch (err) {
+      console.error(err);
+      toast("Couldn't read that file");
+    }
+  };
+  r.readAsText(f);
+  ev.target.value = "";
+};
+
+let toastTimer = null;
+function toast(msg) {
+  const el = $("#toast");
+  el.textContent = msg;
+  el.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("on"), 2200);
+}
+
+/* ── wiring ── */
+$("#tabs").onclick = (ev) => {
+  const b = ev.target.closest(".tab");
+  if (b) setView(b.dataset.view);
+};
+
+$("#newEst").onclick = () => { newEstimate(); setView("build"); };
+
+$("#estList").onclick = (ev) => {
+  const del = ev.target.closest("[data-del]");
+  if (del) {
+    ev.stopPropagation();
+    const e = S.estimates.find((x) => x.id === del.dataset.del);
+    if (!confirm(`Delete estimate ${e ? e.number : ""}? This can't be undone.`)) return;
+    S.estimates = S.estimates.filter((x) => x.id !== del.dataset.del);
+    if (S.currentId === del.dataset.del) S.currentId = null;
+    save(); renderList(); return;
+  }
+  const dup = ev.target.closest("[data-dup]");
+  if (dup) {
+    ev.stopPropagation();
+    const src = S.estimates.find((x) => x.id === dup.dataset.dup);
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = uid();
+    copy.number = nextNumber();
+    copy.project = src.project ? src.project + " (copy)" : "";
+    copy.date = new Date().toISOString().slice(0, 10);
+    copy.createdAt = copy.updatedAt = Date.now();
+    for (const k of Object.keys(copy.lines)) copy.lines[k].forEach((ln) => { ln.id = uid(); });
+    S.estimates.unshift(copy);
+    S.currentId = copy.id;
+    save(); setView("build"); return;
+  }
+  const open = ev.target.closest("[data-open]");
+  if (open) { S.currentId = open.dataset.open; save(); setView("build"); }
+};
+
+$("#detailSeg").onclick = (ev) => {
+  const b = ev.target.closest("button");
+  const est = current();
+  if (!b || !est) return;
+  est.detail = b.dataset.detail;
+  touch(); renderQuote();
+};
+$("#qShowQty").onchange = (ev) => {
+  const est = current();
+  if (!est) return;
+  est.showQty = ev.target.checked;
+  touch(); renderQuote();
+};
+$("#printQuote").onclick = () => window.print();
+
+$("#exportAll").onclick = exportBackup;
+$("#exportAll2").onclick = exportBackup;
+$("#importAll").onclick = importBackup;
+$("#importAll2").onclick = importBackup;
+$("#resetAll").onclick = () => {
+  if (!confirm("Delete every estimate and reset all rates to $0 on this device? Export a backup first if you want to keep anything.")) return;
+  localStorage.removeItem(KEY);
+  S = freshState();
+  save(); applyBrand(); setView("estimates");
+  toast("Everything reset");
+};
+
+initBuildEvents();
+applyBrand();
+setView("estimates");
+</script>
+</body>
+</html>
