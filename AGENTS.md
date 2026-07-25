@@ -179,48 +179,37 @@ A change is done when all are true:
 4. Docs updated when behavior or commands change
 5. PR description follows the [PR template](.github/PULL_REQUEST_TEMPLATE.md) with all sections filled in (including Model Used)
 
-## 11. Fork-Specific: HenkDz/paperclip
+## 12. Adapters and Plugins
 
-This is a fork of `paperclipai/paperclip` with QoL patches and a **built-in** Hermes adapter story on branch `feat/externalize-hermes-adapter` ([tree](https://github.com/HenkDz/paperclip/tree/feat/externalize-hermes-adapter)).
+Read `packages/adapters/AUTHORING.md` before changing adapter code — it holds the
+invariants that are easiest to violate from inside an adapter package, including the
+no-remote-git contract enforced by `scripts/check-no-git-push.mjs`.
 
-### Branch Strategy
+### Built-in adapters
 
-- `feat/externalize-hermes-adapter` now ships `hermes_local` and `hermes_gateway` as built-in core adapters.
-- Older fork branches may still document plugin-only Hermes; treat this file as authoritative for the current branch.
+Built-in adapters are declared in `server/src/adapters/builtin-adapter-types.ts` and wired
+up in `server/src/adapters/registry.ts`, with the UI side in `ui/src/adapters/`. They are
+available without any Adapter manager installation.
 
-### Hermes (built-in)
+Hermes ships as two built-ins:
 
-- `hermes_local` is available without Adapter manager installation and runs the local Hermes CLI.
-- `hermes_gateway` is available without Adapter manager installation and calls an already-running Hermes API server.
-- Operators may still install external Hermes packages through Adapter manager to override/shadow the built-ins.
-- Optional: `file:` entry in `~/.paperclip/adapter-plugins.json` remains useful for local development of override packages.
+- `hermes_local` runs the local Hermes CLI.
+- `hermes_gateway` calls an already-running Hermes API server.
 
-### Local Dev
+Operators may still install external Hermes packages through Adapter manager to
+override/shadow the built-ins. A `file:` entry in `~/.paperclip/adapter-plugins.json` is
+useful when developing an override package locally.
 
-- Fork runs on port 3101+ (auto-detects if 3100 is taken by upstream instance)
-- `npx vite build` hangs on NTFS — use `node node_modules/vite/bin/vite.js build` instead
-- Server startup from NTFS takes 30-60s — don't assume failure immediately
-- Kill ALL paperclip processes before starting: `pkill -f "paperclip"; pkill -f "tsx.*index.ts"`
-- Vite cache survives `rm -rf dist` — delete both: `rm -rf ui/dist ui/node_modules/.vite`
+### External adapter plugins
 
-### Fork QoL Patches (not in upstream)
+External adapters load dynamically through `server/src/adapters/plugin-loader.ts`, backed by
+the store at `~/.paperclip/adapter-plugins.json` (`server/src/services/adapter-plugin-store.ts`).
 
-These are local modifications in the fork's UI. If re-copying source, these must be re-applied:
+- The plugin loader must have ZERO hardcoded adapter imports — pure dynamic loading.
+- `createServerAdapter()` must include ALL optional fields (especially `detectModel`).
+- Built-in UI adapters can shadow external plugin parsers; pausing or resuming an external
+  override should restore the built-in parser.
 
-1. **stderr_group** — amber accordion for MCP init noise in `RunTranscriptView.tsx`
-2. **tool_group** — accordion for consecutive non-terminal tools (write, read, search, browser)
-3. **Dashboard excerpt** — `LatestRunCard` strips markdown, shows first 3 lines/280 chars
-
-### Plugin System
-
-PR #2218 (`feat/external-adapter-phase1`) adds external adapter support. See root `AGENTS.md` for full details.
-
-- Adapters can be loaded as external plugins via `~/.paperclip/adapter-plugins.json`
-- The plugin-loader should have ZERO hardcoded adapter imports — pure dynamic loading
-- `createServerAdapter()` must include ALL optional fields (especially `detectModel`)
-- Built-in UI adapters can shadow external plugin parsers; external override pause/resume should restore the built-in parser.
-- Reference external adapters: Droid (npm); Hermes can also be tested as an override package.
-
-## Design system
+## 13. Design system
 
 `DESIGN.md` at the repo root is the source of truth for UI design decisions. The token-only rule applies to all `ui/` changes: every color, spacing, radius, type, shadow, and motion value in `ui/src/components/**` and `ui/src/pages/**` comes from the token layer in `ui/src/index.css` — no hex, raw px, arbitrary Tailwind bracket values, or raw `font-size`/`fontSize` declarations in components, outside the documented allowlist in `ui/src/index.css`. Run `pnpm check:token-gates` (`scripts/check-token-gates.mjs`) before committing UI changes — it fails on any violation not covered by that allowlist.
