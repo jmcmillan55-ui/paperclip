@@ -47,44 +47,57 @@ pnpm 9.15.4.
 
 ```
 server/            Express 5 REST API + orchestration services (the control plane)
-  src/routes/      One file per resource; each exports `xRoutes(db) => Router`
-  src/services/    ~200 domain services; `xService(db)` factories + pure helpers
-  src/middleware/  actor/auth, validate, error handler, logging, redaction, guards
-  src/adapters/    server-side adapter registry wiring
+  src/routes/      ~56 files, one per resource; each exports `xRoutes(db) => Router`
+  src/services/    ~198 domain services; `xService(db)` factories + pure helpers
+  src/middleware/  auth, validate, error handler, logging, redaction, board/proxy guards
+  src/auth/        session + agent API key authentication
+  src/adapters/    server-side adapter registry wiring + plugin loader
   src/realtime/    SSE / live update plumbing
   src/storage/     local_disk + S3 storage providers
   src/secrets/     secret providers (local_encrypted, AWS, …)
-  src/__tests__/   ~390 integration/route tests (see §7)
+  src/http/, lib/  shared HTTP helpers and server-internal utilities
+  src/__tests__/   ~385 integration/route tests + `helpers/` (see §7)
 
 ui/                React 19 + Vite 6 + Tailwind v4 board UI
-  src/pages/       ~126 route-level pages
-  src/components/  Feature components; `components/ui/` holds shadcn-style primitives
-  src/api/         Typed fetch clients, one module per resource, over `src/api/client.ts`
+  src/pages/       ~135 route-level page components
+  src/components/  ~275 feature components; `components/ui/` holds shadcn-style primitives
+  src/api/         ~59 typed fetch clients, one per resource, over `src/api/client.ts`
   src/hooks/       TanStack Query hooks
   src/context/     Company selection and other app-level context
+  src/adapters/    UI-side mirror of the adapter registry
+  src/plugins/     UI plugin host
+  src/i18n/, lib/  translations and shared UI utilities
   src/index.css    THE design token source (Tailwind v4 `@theme`; no tailwind.config)
   storybook/       Storybook config + ~69 stories (kept out of app source)
 
 packages/
-  db/              Drizzle schema (`src/schema/*.ts`, 108 tables), 191 SQL migrations,
-                   embedded-Postgres bootstrap, backup, migration safety checks
+  db/              Drizzle schema (108 modules in `src/schema/*.ts`, ~158 tables),
+                   191 SQL migrations, embedded-Postgres bootstrap, backup,
+                   migration numbering/safety checks
   shared/          Cross-layer contract: `api.ts` (path constants), `types/`,
-                   `validators/` (zod), `constants.ts`, `telemetry/`
+                   `validators/` (zod), `constants.ts`, `telemetry/`, app-definitions
   adapters/        One package per adapter: claude-local, codex-local, cursor-local,
                    cursor-cloud, gemini-local, grok-local, opencode-local, pi-local,
                    hermes, hermes-gateway, openclaw-gateway (+ AUTHORING.md)
-  adapter-utils/   Shared adapter helpers (ssh round-trip, parsing, process control)
-  plugins/         Plugin SDK, scaffolder, example + sandbox-provider plugins
+  adapter-utils/   Shared adapter helpers (ssh round-trip, sandboxes, managed runtimes,
+                   workspace sync, redaction, process control)
+  plugins/         Plugin SDK (`sdk/`), scaffolder (`create-paperclip-plugin`),
+                   `examples/`, `sandbox-providers/`, fake-sandbox + wiki/diff plugins
   skills-catalog/  App-shipped company skills catalog + generated/catalog.json
   teams-catalog/   App-shipped agentcompanies/v1 team packages
   mcp-server/      Paperclip MCP server
+  google-sheets-mcp-server/, kv-demo-mcp-server/   demo/reference MCP servers
 
-cli/               `paperclipai` CLI (onboard, run, doctor, worktree, auth, routines…)
-scripts/           Dev runner, test runner, release, codemods, CI gate checks
+cli/               `paperclipai` CLI (onboard, run, doctor, worktree, env, routines,
+                   pipelines, db-backup, configure, heartbeat-run…)
+scripts/           Dev runner, test runner, release, codemods, CI gate checks, smoke tests
 tests/             e2e/ (Playwright), release-smoke/, storybook-visual/
-doc/               Internal specs and operational docs (see §1)
+doc/               Internal specs and operational docs (see §1); `doc/plans/`, `doc/design/`
 docs/              Public Mintlify docs site (`pnpm docs:dev`)
 skills/            Paperclip runtime skills (NOT the shipped catalog)
+evals/             promptfoo eval suite (`pnpm evals:smoke`)
+tools/             agent-shim and other dev-side tooling
+design/, report/, releases/, screenshots/   working notes and generated artifacts
 .agents/, .claude/ Repo-local agent skills and subagent definitions
 ```
 
@@ -121,6 +134,9 @@ pnpm storybook                  # UI Storybook on :6006
 pnpm docs:dev                   # Mintlify docs site
 pnpm paperclipai <command>      # the CLI (onboard, doctor, worktree, run, …)
 pnpm dev --bind lan|tailnet     # authenticated/private dev modes
+pnpm db:backup                  # snapshot the local instance database
+pnpm build:feature-catalog      # regenerate the feature catalog
+pnpm evals:smoke                # promptfoo eval suite
 ```
 
 **Git worktrees:** never point two servers at the same embedded Postgres data dir. Use
@@ -213,10 +229,13 @@ Notes:
 - `packages/db/drizzle.config.ts` reads the **compiled** schema from `dist/schema/*.js`, so
   `db:generate` builds first. A missing export from `schema/index.ts` = a missing migration.
 - Migrations are `NNNN_name.sql` under `packages/db/src/migrations` with a `meta/_journal.json`.
-  Numbering must be unique and strictly ordered (`check-migration-numbering.ts`) — rebase
-  collisions need renumbering, not a duplicate index.
-- `check-migration-safety.ts` guards destructive operations; there are dedicated
-  per-migration tests in `packages/db/src/*-migration.test.ts` for non-trivial changes.
+  Numbering must be unique and strictly ordered (`packages/db/src/check-migration-numbering.ts`)
+  — rebase collisions need renumbering, not a duplicate index.
+- `packages/db/src/check-migration-safety.ts` guards destructive operations against
+  `migration-safety-baseline.ts`; there are dedicated per-migration tests in
+  `packages/db/src/*-migration.test.ts` for non-trivial changes.
+- Both checks run as `pnpm --filter @paperclipai/db check:migrations`, which is also the
+  first step of that package's `build` — so a numbering or safety violation fails the build.
 - Commit the generated SQL with the schema change in the same commit.
 
 ---
@@ -248,8 +267,9 @@ Catalog packages (`packages/skills-catalog`, `packages/teams-catalog`) ship a ch
 category, or slug, regenerate in the same commit:
 
 ```sh
-pnpm --filter @paperclipai/skills-catalog build:manifest
-pnpm --filter @paperclipai/skills-catalog validate
+pnpm --filter @paperclipai/skills-catalog build:manifest && \
+  pnpm --filter @paperclipai/skills-catalog validate
+# same pair of scripts exists on @paperclipai/teams-catalog — run it for TEAM.md edits
 ```
 
 CI fails if the regenerated manifest differs from the committed one.
@@ -275,9 +295,15 @@ pnpm test:watch     # interactive Vitest
 pnpm -r typecheck
 pnpm build
 
+pnpm test:run:general        # the two halves run-vitest-stable splits into — useful
+pnpm test:run:serialized     # for reproducing a single CI lane locally
+
 pnpm test:e2e                # Playwright e2e            } opt-in — run only when
 pnpm test:release-smoke      # release smoke             } your change touches them
 pnpm test:storybook-visual   # Storybook visual diffs    } or you're verifying CI
+
+pnpm typecheck:build-gaps    # typecheck workspaces whose build scripts skip tsc
+pnpm test:release-registry   # release manifest/bootstrap/no-git-push node:test suite
 ```
 
 `run-vitest-stable.mjs` splits the suite into `general` and `serialized` modes (route/authz
@@ -397,14 +423,19 @@ Repo hygiene:
 | Gate | Script |
 |---|---|
 | Manual lockfile edits | inline diff check against merge base |
-| `git push` in adapter/runtime code | `scripts/check-no-git-push.mjs` |
+| `git push` in adapter/runtime code | `scripts/check-no-git-push.mjs` (+ its own `node --test`) |
 | Dockerfile deps stage drift | `scripts/check-docker-deps-stage.mjs` |
+| Test shard partitioning | `scripts/__tests__/run-vitest-stable-shard.test.mjs`, `e2e-shard.test.mjs` |
+| Release verify workflow wiring | `scripts/__tests__/release-verify-workflow.test.mjs` |
+| Standalone package build concurrency | `scripts/__tests__/build-standalone-concurrency.test.mjs` |
 | Release package manifest | `scripts/release-package-map.mjs check` |
 | Release package bootstrap | `scripts/check-release-package-bootstrap.mjs` |
 | Dependency resolution on manifest change | `pnpm install --lockfile-only` |
 
-Then typecheck, sharded Vitest, build, and (label- or workflow-gated) e2e, release-smoke,
-storybook-visual, and docker workflows.
+The `policy` job runs all of those with no install, and uploads a regenerated lockfile the
+later jobs restore. Then come `typecheck:build-gaps` + `test:release-registry`, the sharded
+general/serialized Vitest lanes, and build. `storybook-visual.yml` also runs on PRs to
+`master`; `e2e.yml` and `release-smoke.yml` are `workflow_dispatch` only.
 
 **Fork posture.** Five workflows are `workflow_dispatch` only on this fork and never fire
 on their own:
@@ -441,3 +472,11 @@ the fork's `on:` block.
 - Adapter guidance lives in `AGENTS.md` §12 and `packages/adapters/AUTHORING.md`; built-in
   adapters are declared in `server/src/adapters/builtin-adapter-types.ts` and wired in
   `registry.ts`, so adding one touches both plus `ui/src/adapters/`.
+- `build`, `typecheck`, and `test:run` all run `preflight:workspace-links` first
+  (`scripts/ensure-workspace-package-links.ts`). If a run fails there, the fix is the
+  workspace link, not your change.
+- `embedded-postgres` and `acpx` are patched (`patches/`, `pnpm.patchedDependencies`).
+  Bumping either version orphans its patch and breaks install — update the patch too.
+- Some workspace globs are deliberately negated in `pnpm-workspace.yaml`
+  (`packages/plugins/sandbox-providers/**`, the orchestration smoke example) to keep them
+  out of the root lockfile. Don't "fix" those exclusions.
