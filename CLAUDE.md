@@ -432,10 +432,26 @@ Repo hygiene:
 | Release package bootstrap | `scripts/check-release-package-bootstrap.mjs` |
 | Dependency resolution on manifest change | `pnpm install --lockfile-only` |
 
-The `policy` job runs all of those with no install, and uploads a regenerated lockfile the
-later jobs restore. Then come `typecheck:build-gaps` + `test:release-registry`, the sharded
-general/serialized Vitest lanes, and build. `storybook-visual.yml` also runs on PRs to
-`master`; `e2e.yml` and `release-smoke.yml` are `workflow_dispatch` only.
+The `policy` job runs all of those with no install, and uploads a regenerated lockfile every
+later job restores (`continue-on-error`, so it is a no-op when the lockfile is untouched).
+Everything else in `pr.yml` needs `policy`, so a gate failure short-circuits the whole run:
+
+| Job | What it runs |
+|---|---|
+| `typecheck_release_registry` | `typecheck:build-gaps` + `test:release-registry` |
+| `general_tests` | sharded general Vitest lanes (`server (1-3/3)`, `workspaces-a/b`), aggregated by `verify` |
+| `verify_serialized_server` | the DB-heavy serialized server suites, 4 shards |
+| `build` | `pnpm build` |
+| `canary_dry_run` | `scripts/release.sh canary --skip-verify --dry-run` |
+| `e2e_shards` | Playwright e2e, 2 shards, aggregated by the `e2e` check |
+
+Note that **e2e runs on every PR** through `pr.yml`'s own `e2e_shards` job — `e2e.yml`
+being `workflow_dispatch` only does not mean e2e is skipped on PRs. The `verify` and `e2e`
+jobs exist to preserve stable required-check names in front of their matrices, so those are
+the names branch protection should reference, not the individual shards.
+`storybook-visual.yml` triggers on PRs to `master` but its job is gated on the
+`storybook-visual` label — without that label it reports as skipped, so add the label to
+actually get visual diffs. `release-smoke.yml` is `workflow_dispatch` only.
 
 **Fork posture.** Five workflows are `workflow_dispatch` only on this fork and never fire
 on their own:
