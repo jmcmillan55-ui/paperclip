@@ -34,6 +34,34 @@ Most outfits already have a sheet with their equipment on it. Use the same names
 item codes here, so the estimator and whatever your crews already fill out refer to a machine
 the same way.
 
+## Dirt & rock takeoff
+
+The **Takeoff** screen turns dimensions into tons. Enter length × width × depth (or area ×
+depth), pick a material, and it gives you four numbers that are not interchangeable:
+
+| Number | What it is | When you use it |
+| --- | --- | --- |
+| **Tons** | bank volume × density ÷ 2000 | ordering and paying for material |
+| **Bank yd³** | what it measures in the ground | the hole you are digging |
+| **Loose yd³** | bank + swell | what actually rides in the truck |
+| **Compacted yd³** | bank − shrink | what you end up with after rolling it |
+
+Getting these confused is the classic way to lose money on dirt. Haul off the bank number and
+you are short on trucks — blasted rock swells better than 50%. Order the bank number for fill
+and you come up short on the pad once it compacts.
+
+Loads are computed from tons ÷ truck capacity and rounded up, since half a trip does not exist.
+
+Material presets carry a typical density, swell, and shrink for topsoil, sand, gravel, #57,
+crusher run, clay, common fill, shale, broken and solid rock, millings, and broken concrete.
+**They are starting points.** Real figures move with moisture, gradation, and which pit it came
+from — every field is editable, and one phone call to your supplier is worth more than any
+table.
+
+`Add as a material line` drops the tonnage straight onto the estimate at the right unit;
+`Add as mobilization` adds the trips. Either way the takeoff is saved on the estimate, so
+months later you can still show how you arrived at the number.
+
 ## How the margin math works
 
 Prices use **gross margin**, not markup:

@@ -604,6 +604,7 @@ table.q-tbl tr.sub td.n { font-weight: 700; }
     <nav class="tabs" id="tabs">
       <button class="tab" data-view="estimates" aria-current="true">Estimates</button>
       <button class="tab" data-view="build">Build</button>
+      <button class="tab" data-view="takeoff">Takeoff</button>
       <button class="tab" data-view="quote">Quote</button>
       <button class="tab" data-view="rates">Rates</button>
       <button class="tab" data-view="setup">Setup</button>
@@ -644,6 +645,10 @@ table.q-tbl tr.sub td.n { font-weight: 700; }
   </section>
 
   <!-- ══════════ QUOTE ══════════ -->
+  <section class="view" id="view-takeoff" hidden>
+    <div id="takeoffBody"></div>
+  </section>
+
   <section class="view" id="view-quote" hidden>
     <div class="toolbar">
       <div class="seg" id="detailSeg" role="group" aria-label="Quote detail level">
@@ -1056,6 +1061,7 @@ function newEstimate() {
     date: new Date().toISOString().slice(0, 10),
     scope: "",
     lines: { equipment: [], labor: [], materials: [], mobilization: [], lodging: [] },
+    takeoffs: [],
     margins: {},
     contingencyPct: 0,
     detail: "detailed",
@@ -1108,6 +1114,7 @@ function setView(v) {
   $$(".view").forEach((s) => { s.hidden = s.id !== `view-${v}`; });
   if (v === "estimates") renderList();
   if (v === "build")     renderBuild();
+  if (v === "takeoff")   renderTakeoff();
   if (v === "quote")     renderQuote();
   if (v === "rates")     renderRates();
   if (v === "setup")     renderSetup();
@@ -1520,6 +1527,188 @@ function updateTotals() {
 }
 
 /* ── quote ── */
+
+/* ══════════════════════════════════════════════════════════════
+   Dirt & rock takeoff
+   ──────────────────────────────────────────────────────────────
+   Three numbers get contractors in trouble, and they are all here:
+
+     bank      what the dirt measures in the ground
+     loose     what it measures in the truck once you dig it (swell)
+     compacted what it measures once you place and roll it (shrink)
+
+   Haul off the bank number and you are short on trucks. Order the
+   bank number for fill and you are short on the pad. Tons come off
+   the bank volume times density, because that is how the pit
+   weighs it.
+
+   Densities are lb per bank cubic yard and are TYPICAL. Real
+   numbers move with moisture, gradation, and whose pit it is —
+   every field here is editable, and it is worth calling your
+   supplier once and correcting them.
+   ══════════════════════════════════════════════════════════════ */
+const TAKEOFF_MATERIALS = [
+  /* name,                    lb/bank yd³, swell %, shrink % */
+  ["Topsoil",                        2200, 25, 15],
+  ["Loam",                           2300, 25, 12],
+  ["Sand, dry",                      2700, 12,  8],
+  ["Sand, wet",                      3200, 12,  8],
+  ["Gravel, bank run",               2900, 12,  8],
+  ["Crushed stone, #57",             2800, 15,  0],
+  ["Crusher run / ABC",              2950, 15,  8],
+  ["Clay, dry",                      2800, 30, 10],
+  ["Clay, wet",                      3100, 30, 10],
+  ["Common earth / fill",            2700, 25, 12],
+  ["Shale",                          2900, 33,  0],
+  ["Rock, blasted / broken",         3300, 55,  0],
+  ["Rock, solid in place",           4200, 60,  0],
+  ["Asphalt millings",               2400, 15, 10],
+  ["Concrete, broken",               3400, 55,  0]
+];
+
+function takeoffDefaults() {
+  return {
+    mode: "lwd",            // lwd = length x width x depth, or "area"
+    label: "",
+    length: 0, width: 0, area: 0,
+    depth: 0, depthUnit: "in",
+    material: "Crushed stone, #57",
+    density: 2800, swell: 15, shrink: 0,
+    truckTons: 20           // typical tandem load; tri-axle runs nearer 30
+  };
+}
+let TK = takeoffDefaults();
+
+function takeoffCalc(k) {
+  const depthFt = k.depthUnit === "in" ? num(k.depth) / 12 : num(k.depth);
+  const areaSf  = k.mode === "area" ? num(k.area) : num(k.length) * num(k.width);
+  const bankCy  = (areaSf * depthFt) / 27;
+  const looseCy = bankCy * (1 + num(k.swell) / 100);
+  const compCy  = bankCy * (1 - num(k.shrink) / 100);
+  const tons    = (bankCy * num(k.density)) / 2000;
+  const loads   = num(k.truckTons) > 0 ? tons / num(k.truckTons) : 0;
+  return { areaSf, depthFt, bankCy, looseCy, compCy, tons, loads };
+}
+
+function renderTakeoff() {
+  const est = current();
+  const c = takeoffCalc(TK);
+  const n1 = (v) => (Math.round(v * 10) / 10).toLocaleString();
+  const saved = est && Array.isArray(est.takeoffs) ? est.takeoffs : [];
+
+  $("#takeoffBody").innerHTML = `
+  <div class="notice info"><div><strong>Dirt &amp; rock takeoff.</strong> Measure it once, and the
+    same numbers go to the quote. <strong>Bank</strong> is what it measures in the ground,
+    <strong>loose</strong> is what you haul, <strong>compacted</strong> is what you place.
+    Tons come off the bank volume.</div></div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Measure</span><h2>Dimensions</h2>
+      <span class="seg" id="tkMode">
+        <button data-mode="lwd"  aria-pressed="${TK.mode === "lwd"}">L × W × D</button>
+        <button data-mode="area" aria-pressed="${TK.mode === "area"}">Area × D</button>
+      </span></div>
+    <div class="panel-body">
+      <label class="field"><span>What is this for? (prints on the estimate)</span>
+        <input type="text" data-tk="label" value="${esc(TK.label)}" placeholder="Access drive — 240 ft" /></label>
+      <div class="g4 mt4">
+        ${TK.mode === "lwd" ? `
+          <label class="field"><span>Length (ft)</span><input type="number" step="0.1" data-tk="length" value="${esc(TK.length)}" /></label>
+          <label class="field"><span>Width (ft)</span><input type="number" step="0.1" data-tk="width" value="${esc(TK.width)}" /></label>
+        ` : `
+          <label class="field"><span>Area (sq ft)</span><input type="number" step="1" data-tk="area" value="${esc(TK.area)}" /></label>
+        `}
+        <label class="field"><span>Depth</span><input type="number" step="0.1" data-tk="depth" value="${esc(TK.depth)}" /></label>
+        <label class="field"><span>Depth unit</span>
+          <select data-tk="depthUnit">
+            <option value="in"${TK.depthUnit === "in" ? " selected" : ""}>inches</option>
+            <option value="ft"${TK.depthUnit === "ft" ? " selected" : ""}>feet</option>
+          </select></label>
+      </div>
+      <p class="subtle mt4">${n1(c.areaSf)} sq ft × ${n1(c.depthFt * 12)} in deep</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Material</span><h2>Weight &amp; behaviour</h2></div>
+    <div class="panel-body">
+      <div class="g4">
+        <label class="field"><span>Material</span>
+          <select data-tk="material">
+            ${TAKEOFF_MATERIALS.map(([n]) => `<option${n === TK.material ? " selected" : ""}>${esc(n)}</option>`).join("")}
+          </select></label>
+        <label class="field"><span>Density (lb / bank yd³)</span><input type="number" step="10" data-tk="density" value="${esc(TK.density)}" /></label>
+        <label class="field"><span>Swell %</span><input type="number" step="1" data-tk="swell" value="${esc(TK.swell)}" /></label>
+        <label class="field"><span>Shrink %</span><input type="number" step="1" data-tk="shrink" value="${esc(TK.shrink)}" /></label>
+      </div>
+      <p class="subtle mt4">Picking a material fills these in with typical figures. They move with moisture and
+        gradation — if your supplier gives you real numbers, type them over the top.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Result</span><h2>Quantities</h2></div>
+    <div class="panel-body">
+      <div class="tstat" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:var(--s4)">
+        <div><div class="eyebrow">Tons</div><div class="num" style="font-size:var(--t-2xl)">${n1(c.tons)}</div></div>
+        <div><div class="eyebrow">Bank yd³</div><div class="num" style="font-size:var(--t-lg)">${n1(c.bankCy)}</div></div>
+        <div><div class="eyebrow">Loose yd³ (haul)</div><div class="num" style="font-size:var(--t-lg)">${n1(c.looseCy)}</div></div>
+        <div><div class="eyebrow">Compacted yd³</div><div class="num" style="font-size:var(--t-lg)">${n1(c.compCy)}</div></div>
+      </div>
+      <div class="g2 mt4">
+        <label class="field"><span>Truck capacity (tons per load)</span>
+          <input type="number" step="0.5" data-tk="truckTons" value="${esc(TK.truckTons)}" /></label>
+        <div class="field"><span>Loads</span>
+          <div class="num" style="font-size:var(--t-lg);padding-top:6px">${n1(c.loads)} <span class="subtle">(${Math.ceil(c.loads)} trips)</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Use it</span><h2>Send to the estimate</h2></div>
+    <div class="panel-body">
+      ${est ? `
+        <div class="btn-row">
+          <button class="btn" data-send="material">Add ${n1(c.tons)} tons as a material line</button>
+          <button class="btn ghost" data-send="haul">Add ${Math.ceil(c.loads)} loads as mobilization</button>
+          <button class="btn ghost" data-send="save">Save takeoff only</button>
+        </div>
+        <p class="subtle mt4">Sending also saves the takeoff on <strong>${esc(est.number)}</strong>, so months from now
+          you can still show how you got ${n1(c.tons)} tons.</p>
+      ` : `<div class="lines-empty">No estimate open. Start or open one under
+             <a href="#" data-goto="estimates">Estimates</a> to send these quantities to a line.</div>`}
+    </div>
+  </div>
+
+  ${saved.length ? `
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">On this estimate</span><h2>Saved takeoffs</h2></div>
+    <div class="panel-body">
+      ${saved.map((s, i) => `
+        <div class="lrow lrow-out">
+          <div style="flex:1">
+            <strong>${esc(s.label || "Untitled takeoff")}</strong>
+            <div class="subtle">${esc(s.material)} · ${n1(s.tons)} tons · ${n1(s.bankCy)} bank yd³ ·
+              ${n1(s.looseCy)} loose yd³${s.dims ? " · " + esc(s.dims) : ""}</div>
+          </div>
+          <button class="btn ghost sm" data-rm-tk="${i}">Remove</button>
+        </div>`).join("")}
+    </div>
+  </div>` : ""}`;
+}
+
+function saveTakeoff(est, c) {
+  if (!Array.isArray(est.takeoffs)) est.takeoffs = [];
+  const dims = TK.mode === "lwd"
+    ? `${num(TK.length)} × ${num(TK.width)} ft × ${num(TK.depth)} ${TK.depthUnit}`
+    : `${num(TK.area)} sf × ${num(TK.depth)} ${TK.depthUnit}`;
+  est.takeoffs.push({
+    id: uid(), label: TK.label, material: TK.material, dims,
+    density: num(TK.density), swell: num(TK.swell), shrink: num(TK.shrink),
+    bankCy: c.bankCy, looseCy: c.looseCy, compCy: c.compCy, tons: c.tons, loads: c.loads
+  });
+}
+
 function renderQuote() {
   const est = current();
   const paper = $("#quotePaper");
@@ -2016,6 +2205,62 @@ function seedDemo() {
 if (seedDemo()) {
   setTimeout(() => toast("Demo data loaded — this is what a filled-in estimate looks like"), 500);
 }
+
+/* ── takeoff wiring ── */
+$("#takeoffBody").addEventListener("input", (ev) => {
+  const k = ev.target.dataset.tk;
+  if (!k) return;
+  // A select fires input before change, and the re-render below detaches the
+  // node so the change listener never runs — apply the preset here instead.
+  if (k === "material") {
+    const row = TAKEOFF_MATERIALS.find(([n]) => n === ev.target.value);
+    if (row) { TK.material = row[0]; TK.density = row[1]; TK.swell = row[2]; TK.shrink = row[3]; }
+    renderTakeoff(); return;
+  }
+  TK[k] = ev.target.type === "number" ? num(ev.target.value) : ev.target.value;
+  renderTakeoff();
+});
+
+
+
+$("#takeoffBody").addEventListener("click", (ev) => {
+  const m = ev.target.closest("[data-mode]");
+  if (m) { TK.mode = m.dataset.mode; renderTakeoff(); return; }
+
+  const rm = ev.target.closest("[data-rm-tk]");
+  if (rm) {
+    const est = current(); if (!est) return;
+    est.takeoffs.splice(Number(rm.dataset.rmTk), 1);
+    touch(); renderTakeoff(); return;
+  }
+
+  const send = ev.target.closest("[data-send]");
+  if (!send) return;
+  const est = current(); if (!est) return;
+  const c = takeoffCalc(TK);
+  const what = send.dataset.send;
+  const name = TK.label || TK.material;
+
+  if (what === "material") {
+    est.lines.materials.push({
+      id: uid(), desc: TK.label ? `${TK.label} — ${TK.material}` : TK.material,
+      qty: Math.round(c.tons * 10) / 10, unit: "ton", rate: 0, margin: "", taxable: true
+    });
+    saveTakeoff(est, c); touch();
+    toast(`${Math.round(c.tons * 10) / 10} tons added — set the price per ton on Build`);
+    setView("build"); return;
+  }
+  if (what === "haul") {
+    est.lines.mobilization.push({
+      id: uid(), desc: `Haul — ${name}`,
+      qty: Math.ceil(c.loads), unit: "load", rate: 0, margin: ""
+    });
+    saveTakeoff(est, c); touch();
+    toast(`${Math.ceil(c.loads)} loads added — set the price per load on Build`);
+    setView("build"); return;
+  }
+  saveTakeoff(est, c); touch(); renderTakeoff(); toast("Takeoff saved to this estimate");
+});
 
 applyBrand();
 setView("estimates");
