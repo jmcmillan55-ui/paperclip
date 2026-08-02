@@ -6,33 +6,40 @@
 <title>Field Log</title>
 <style>
 :root {
-  --hunter:        #2E5339;
-  --hunter-deep:   #1B3323;
-  --hunter-lift:   #3D6B4A;
-  --hunter-tint:   #EDF2EE;
-  --hunter-tint-2: #DFE9E1;
+  /* Hunter green carries the app; bronze is the second voice, used on labels,
+     rules, and money. Grounds are a warm white and a near-black with a green
+     bias, so the neutrals read as chosen rather than inherited. */
+  --hunter:        #2C5540;
+  --hunter-deep:   #16301F;
+  --hunter-lift:   #3E6E52;
+  --hunter-tint:   #EDF2EF;
+  --hunter-tint-2: #DDE7E0;
 
-  --canvas:  #F6F9F6;
+  --bronze:      #A87545;
+  --bronze-lift: #C89A6B;
+  --bronze-tint: #F6EEE4;
+
+  --canvas:  #FBFAF8;
   --paper:   #FFFFFF;
   --panel:   #FFFFFF;
-  --ink:     #14201A;
-  --ink-2:   #34473B;
-  --muted:   #5C6B61;
-  --faint:   #8A9A90;
-  --line:    #D3DED6;
-  --line-2:  #E6EDE8;
+  --ink:     #0D110F;
+  --ink-2:   #333B36;
+  --muted:   #6B7269;
+  --faint:   #9AA098;
+  --line:    #E5E2DB;
+  --line-2:  #F1EFEA;
 
   --good: #2E7D4F;
-  --warn: #B07419;
+  --warn: #B0791F;
   --crit: #A63328;
-  --brass: #A67C1A;          /* reserved: the profit figure only */
+  --brass: #A87545;          /* alias kept: the profit figure reads bronze */
 
   --field-bg:     #FFFFFF;
-  --field-line:   #C9D6CD;
-  --field-focus:  #2E5339;
-  --shadow-sm: 0 1px 2px rgba(20, 32, 26, .06);
-  --shadow-md: 0 4px 14px rgba(20, 32, 26, .10);
-  --shadow-lg: 0 14px 40px rgba(20, 32, 26, .16);
+  --field-line:   #DFDBD2;
+  --field-focus:  #A87545;
+  --shadow-sm: 0 1px 2px rgba(13, 17, 15, .04);
+  --shadow-md: 0 6px 20px rgba(13, 17, 15, .07);
+  --shadow-lg: 0 18px 48px rgba(13, 17, 15, .12);
 
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
@@ -40,7 +47,7 @@
 
   --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
   --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
-  --r1: 3px;  --r2: 6px;  --r3: 10px;
+  --r1: 6px;  --r2: 10px; --r3: 16px;
 
   --t-xs: 11px; --t-sm: 13px; --t-md: 15px;
   --t-lg: 19px; --t-xl: 25px; --t-2xl: 33px;
@@ -48,60 +55,66 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --hunter:        #6FA97E;
-    --hunter-deep:   #8FC49C;
-    --hunter-lift:   #5B9169;
-    --hunter-tint:   #1A251E;
-    --hunter-tint-2: #212E25;
+    --hunter:        #7FB894;
+    --hunter-deep:   #A5D3B4;
+    --hunter-lift:   #5F8E70;
+    --hunter-tint:   #17211B;
+    --hunter-tint-2: #1E2A22;
 
-    --canvas: #0F1512;
-    --paper:  #151E18;
-    --panel:  #16211B;
-    --ink:    #E8F0EA;
-    --ink-2:  #C3D3C8;
-    --muted:  #93A69A;
-    --faint:  #6E8175;
-    --line:   #27332B;
-    --line-2: #202B23;
+    --bronze:      #D2A06A;
+    --bronze-lift: #E3BB8C;
+    --bronze-tint: #241C13;
+
+    --canvas: #0B0F0C;
+    --paper:  #121814;
+    --panel:  #141B16;
+    --ink:    #ECF1ED;
+    --ink-2:  #C6D0C9;
+    --muted:  #939C95;
+    --faint:  #6D766F;
+    --line:   #232C26;
+    --line-2: #1A211C;
 
     --good: #5FBF85;
     --warn: #D9A03F;
     --crit: #E0705F;
-    --brass: #D6AC4E;
+    --brass: #D2A06A;
 
-    --field-bg:   #101914;
-    --field-line: #2E3D33;
-    --field-focus: #6FA97E;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-    --shadow-md: 0 4px 14px rgba(0,0,0,.45);
-    --shadow-lg: 0 14px 40px rgba(0,0,0,.55);
+    --field-bg:   #0E1410;
+    --field-line: #2A342D;
+    --field-focus: #D2A06A;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.45);
+    --shadow-md: 0 6px 20px rgba(0,0,0,.5);
+    --shadow-lg: 0 18px 48px rgba(0,0,0,.6);
   }
 }
 
 /* The viewer's theme toggle must win over the OS preference, both ways. */
 :root[data-theme="dark"] {
-  --hunter: #6FA97E; --hunter-deep: #8FC49C; --hunter-lift: #5B9169;
-  --hunter-tint: #1A251E; --hunter-tint-2: #212E25;
-  --canvas: #0F1512; --paper: #151E18; --panel: #16211B;
-  --ink: #E8F0EA; --ink-2: #C3D3C8; --muted: #93A69A; --faint: #6E8175;
-  --line: #27332B; --line-2: #202B23;
-  --good: #5FBF85; --warn: #D9A03F; --crit: #E0705F; --brass: #D6AC4E;
-  --field-bg: #101914; --field-line: #2E3D33; --field-focus: #6FA97E;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-  --shadow-md: 0 4px 14px rgba(0,0,0,.45);
-  --shadow-lg: 0 14px 40px rgba(0,0,0,.55);
+  --hunter: #7FB894; --hunter-deep: #A5D3B4; --hunter-lift: #5F8E70;
+  --hunter-tint: #17211B; --hunter-tint-2: #1E2A22;
+  --bronze: #D2A06A; --bronze-lift: #E3BB8C; --bronze-tint: #241C13;
+  --canvas: #0B0F0C; --paper: #121814; --panel: #141B16;
+  --ink: #ECF1ED; --ink-2: #C6D0C9; --muted: #939C95; --faint: #6D766F;
+  --line: #232C26; --line-2: #1A211C;
+  --good: #5FBF85; --warn: #D9A03F; --crit: #E0705F; --brass: #D2A06A;
+  --field-bg: #0E1410; --field-line: #2A342D; --field-focus: #D2A06A;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.45);
+  --shadow-md: 0 6px 20px rgba(0,0,0,.5);
+  --shadow-lg: 0 18px 48px rgba(0,0,0,.6);
 }
 :root[data-theme="light"] {
-  --hunter: #2E5339; --hunter-deep: #1B3323; --hunter-lift: #3D6B4A;
-  --hunter-tint: #EDF2EE; --hunter-tint-2: #DFE9E1;
-  --canvas: #F6F9F6; --paper: #FFFFFF; --panel: #FFFFFF;
-  --ink: #14201A; --ink-2: #34473B; --muted: #5C6B61; --faint: #8A9A90;
-  --line: #D3DED6; --line-2: #E6EDE8;
-  --good: #2E7D4F; --warn: #B07419; --crit: #A63328; --brass: #A67C1A;
-  --field-bg: #FFFFFF; --field-line: #C9D6CD; --field-focus: #2E5339;
-  --shadow-sm: 0 1px 2px rgba(20,32,26,.06);
-  --shadow-md: 0 4px 14px rgba(20,32,26,.10);
-  --shadow-lg: 0 14px 40px rgba(20,32,26,.16);
+  --hunter: #2C5540; --hunter-deep: #16301F; --hunter-lift: #3E6E52;
+  --hunter-tint: #EDF2EF; --hunter-tint-2: #DDE7E0;
+  --bronze: #A87545; --bronze-lift: #C89A6B; --bronze-tint: #F6EEE4;
+  --canvas: #FBFAF8; --paper: #FFFFFF; --panel: #FFFFFF;
+  --ink: #0D110F; --ink-2: #333B36; --muted: #6B7269; --faint: #9AA098;
+  --line: #E5E2DB; --line-2: #F1EFEA;
+  --good: #2E7D4F; --warn: #B0791F; --crit: #A63328; --brass: #A87545;
+  --field-bg: #FFFFFF; --field-line: #DFDBD2; --field-focus: #A87545;
+  --shadow-sm: 0 1px 2px rgba(13,17,15,.04);
+  --shadow-md: 0 6px 20px rgba(13,17,15,.07);
+  --shadow-lg: 0 18px 48px rgba(13,17,15,.12);
 }
 
 /* ── base ── */
@@ -125,7 +138,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .chrome {
   position: sticky; top: 0; z-index: 40;
   background: var(--hunter-deep);
-  border-bottom: 1px solid rgba(0,0,0,.2);
+  border-bottom: 1px solid rgba(168, 117, 69, .35);
 }
 :root[data-theme="dark"] .chrome, .chrome { background: var(--hunter-deep); }
 @media (prefers-color-scheme: dark) { .chrome { background: #0C120E; } }
@@ -160,10 +173,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transition: background .12s, color .12s;
 }
 .tab:hover { background: rgba(255,255,255,.10); color: #fff; }
-.tab[aria-current="true"] { background: #fff; color: var(--hunter-deep); font-weight: 650; }
-:root[data-theme="dark"] .tab[aria-current="true"] { background: var(--hunter); color: #0C120E; }
-@media (prefers-color-scheme: dark) { .tab[aria-current="true"] { background: var(--hunter); color: #0C120E; } }
-:root[data-theme="light"] .tab[aria-current="true"] { background: #fff; color: var(--hunter-deep); }
+/* Active tab reads as a lit pill with a bronze underline rather than a solid
+   white block — the same cue, a good deal less weight. */
+.tab[aria-current="true"] {
+  background: rgba(255,255,255,.13); color: #fff; font-weight: 650;
+  box-shadow: inset 0 -2px 0 var(--bronze-lift);
+}
+:root[data-theme="dark"] .tab[aria-current="true"],
+:root[data-theme="light"] .tab[aria-current="true"] {
+  background: rgba(255,255,255,.13); color: #fff;
+  box-shadow: inset 0 -2px 0 var(--bronze-lift);
+}
 
 .wrap { max-width: 1180px; margin: 0 auto; padding: var(--s5) var(--s4) var(--s8); }
 .view[hidden] { display: none; }
@@ -171,21 +191,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* ── panels: carbon-copy form sections ── */
 .panel {
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   border-radius: var(--r3);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   margin-bottom: var(--s5);
   overflow: hidden;
 }
 .panel-head {
   display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap;
-  padding: var(--s4) var(--s4) var(--s3);
-  border-bottom: 1px solid var(--line-2);
+  padding: var(--s5) var(--s5) var(--s3);
 }
 .eyebrow {
   font-family: var(--mono); font-size: var(--t-xs);
-  text-transform: uppercase; letter-spacing: .13em;
-  color: var(--hunter); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--bronze); font-weight: 600;
 }
 .panel-head h2 { font-size: var(--t-lg); }
 .panel-head .hint { color: var(--muted); font-size: var(--t-sm); margin-left: auto; }
@@ -209,7 +228,7 @@ input[type="text"], input[type="number"], input[type="date"], input[type="email"
   background: var(--field-bg);
   border: 1px solid var(--field-line);
   border-radius: var(--r2);
-  padding: 9px var(--s3);
+  padding: 11px var(--s4);
   width: 100%; min-width: 0;
   transition: border-color .12s, box-shadow .12s;
 }
@@ -227,14 +246,17 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   appearance: none; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
   background: var(--hunter); color: #fff;
-  border: 1px solid var(--hunter); border-radius: var(--r2);
-  padding: 9px var(--s4);
+  border: 1px solid transparent; border-radius: var(--r2);
+  padding: 11px var(--s5);
   font-size: var(--t-sm); font-weight: 600;
   transition: filter .12s, background .12s;
 }
-:root[data-theme="dark"] .btn { color: #0C120E; }
-@media (prefers-color-scheme: dark) { .btn { color: #0C120E; } }
-:root[data-theme="light"] .btn { color: #fff; }
+/* Scope the theme flip to filled buttons. Without :not(), these selectors
+   outrank .btn.ghost and .btn.danger and paint their labels the fill colour,
+   which on a dark ground makes the text disappear entirely. */
+:root[data-theme="dark"] .btn:not(.ghost):not(.danger) { color: #0C120E; }
+@media (prefers-color-scheme: dark) { .btn:not(.ghost):not(.danger) { color: #0C120E; } }
+:root[data-theme="light"] .btn:not(.ghost):not(.danger) { color: #fff; }
 .btn:hover { filter: brightness(1.08); }
 .btn.ghost { background: transparent; color: var(--hunter); border-color: var(--field-line); }
 .btn.ghost:hover { background: var(--hunter-tint); border-color: var(--hunter); }
@@ -359,9 +381,9 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 .notice {
   display: flex; gap: var(--s3); align-items: flex-start;
-  padding: var(--s3) var(--s4); border-radius: var(--r2);
-  border: 1px solid color-mix(in srgb, var(--warn) 38%, transparent);
-  background: color-mix(in srgb, var(--warn) 9%, transparent);
+  padding: var(--s4) var(--s5); border-radius: var(--r3);
+  border: 1px solid color-mix(in srgb, var(--warn) 28%, transparent);
+  background: color-mix(in srgb, var(--warn) 7%, transparent);
   font-size: var(--t-sm); color: var(--ink-2); margin-bottom: var(--s4);
 }
 .notice strong { color: var(--ink); }
@@ -453,8 +475,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .q-logo { max-height: 70px; max-width: 190px; object-fit: contain; }
 .q-title { text-align: right; flex: none; }
 .q-title .w {
-  font-family: var(--mono); font-size: 8.5pt; letter-spacing: .18em;
-  text-transform: uppercase; color: #2E5339; font-weight: 700;
+  font-family: var(--mono); font-size: 8.5pt; letter-spacing: .12em;
+  text-transform: uppercase; color: #A87545; font-weight: 700;
 }
 .q-title .no { font-family: var(--mono); font-size: 13pt; font-weight: 700; margin-top: 2px; }
 .q-title .dt { font-family: var(--sans); font-size: 8.5pt; color: #4A5A50; margin-top: 3px; }
@@ -479,16 +501,18 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 
 table.q-tbl { width: 100%; border-collapse: collapse; margin: 8px 0 0; min-width: 27rem; }
 table.q-tbl th {
-  font-family: var(--mono); font-size: 8pt; letter-spacing: .1em;
-  text-transform: uppercase; color: #fff; background: #1B3323;
-  text-align: left; padding: 6px 8px; font-weight: 700;
+  font-family: var(--mono); font-size: 8pt; letter-spacing: .08em;
+  text-transform: uppercase; color: #A87545; background: transparent;
+  text-align: left; padding: 4px 8px 7px; font-weight: 700;
+  border-bottom: 1.5px solid #16301F;
 }
 table.q-tbl th.r, table.q-tbl td.r { text-align: right; }
 table.q-tbl td { padding: 6px 8px; border-bottom: 1px solid #E6EDE8; font-size: 10.5pt; vertical-align: top; }
 table.q-tbl td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 10pt; }
 table.q-tbl tr.grp td {
-  font-family: var(--mono); font-size: 8pt; letter-spacing: .11em; text-transform: uppercase;
-  color: #2E5339; font-weight: 700; background: #EDF2EE; padding: 5px 8px; border-bottom: 1px solid #D3DED6;
+  font-family: var(--mono); font-size: 8pt; letter-spacing: .08em; text-transform: uppercase;
+  color: #16301F; font-weight: 700; background: transparent; padding: 12px 8px 4px;
+  border-bottom: 1px solid #E5E2DB;
 }
 table.q-tbl tr.sub td { border-bottom: 1px solid #D3DED6; }
 table.q-tbl tr.sub td.n { font-weight: 700; }
