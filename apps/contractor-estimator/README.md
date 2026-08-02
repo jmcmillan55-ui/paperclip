@@ -157,6 +157,36 @@ an empty screen.
 Demo data only seeds on a device with nothing saved yet. If there is any real data in the
 browser, `#demo` does nothing at all — it will not overwrite your work.
 
+## Installing it on a phone
+
+`index.html` on its own opens from a file — off a USB stick, out of an email — and that keeps
+working. To get it onto a **home screen** as an app, build the hosted variant:
+
+```sh
+node apps/make-icons.mjs        # once, or after a mark or colour change
+node apps/build-pwa.mjs contractor-estimator
+```
+
+That writes `apps/dist-pwa/contractor-estimator/` — the same page plus the three things a browser wants before
+it will let anyone install it: a manifest, an icon set, and a service worker. The service worker
+is the reason this is a folder rather than a file; it cannot be inlined, it needs its own URL.
+
+Put that folder on any https host — GitHub Pages, Cloudflare Pages, or drag it onto Netlify Drop.
+**https is not optional**: service workers and GPS both refuse to run without it.
+
+Then:
+
+- **Android** offers an install prompt on its own.
+- **iOS** does not, so the page shows a one-time hint: Share, then Add to Home Screen. It appears
+  only on iOS, only outside standalone mode, and only until dismissed.
+
+Once installed it launches full screen with no browser chrome, works with no signal, and keeps its
+data. The header gets safe-area padding in standalone mode so it clears the notch.
+
+Updates land on the next launch: the worker serves from cache first, then fetches a fresh copy in
+the background. The cache name is a hash of the page, so a changed app busts it and an unchanged
+one leaves the user's storage alone.
+
 ## Data and backups
 
 Everything is stored in the browser's `localStorage`, on that device only. There is no
