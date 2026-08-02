@@ -45,7 +45,11 @@ const offenders = [
   [/@import\s+url\(/i, "CSS @import url()"],
   [/https?:\/\/(?!www\.w3\.org)/i, "absolute http(s) URL"]
 ];
-const found = offenders.filter(([re]) => re.test(out)).map(([, label]) => label);
+// XML namespace URIs are identifiers, not fetches — no parser dereferences them,
+// and CSP never sees them. Strip xmlns="..." before the absolute-URL test so a
+// generated KML document does not trip a guard meant for scripts and stylesheets.
+const scanned = out.replace(/\sxmlns(:[A-Za-z0-9_-]+)?=(["'])[^"']*\2/g, "");
+const found = offenders.filter(([re]) => re.test(scanned)).map(([, label]) => label);
 if (found.length) {
   console.error("External references found — the artifact CSP will block these:\n  " + found.join("\n  "));
   process.exit(1);
