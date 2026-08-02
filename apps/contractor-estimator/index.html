@@ -1953,6 +1953,70 @@ $("#resetAll").onclick = () => {
 };
 
 initBuildEvents();
+
+/* ══════════════════════════════════════════════════════════════
+   Demo mode — open the file with #demo on the end of the URL and,
+   ONLY if this device has no data yet, seed a worked example so a
+   first-time viewer sees a finished quote instead of a blank app.
+   Never touches real data: if anything is saved, this does nothing.
+   ══════════════════════════════════════════════════════════════ */
+function seedDemo() {
+  if (location.hash !== "#demo") return false;
+  if (localStorage.getItem(KEY)) return false;
+
+  S.company = {
+    name: "Ridgeway Site Services", address: "144 Mill Road", phone: "(555) 448-9001",
+    email: "office@example.com", license: "SC-88120", logo: ""
+  };
+  S.settings.margins = { equipment: 32, labor: 35, materials: 22, mobilization: 28, lodging: 15, contingency: 0 };
+
+  const cost = {
+    "Excavator (10-25 ton)": 165, "Dozer (medium)": 148, "Skid steer": 82,
+    "Dump truck - tandem": 95, "Equipment transport / lowboy": 130,
+    "Roller / compactor": 68, "Compact track loader": 88, "Wheel loader": 118
+  };
+  S.equipment.forEach((e) => { if (cost[e.name]) e.cost = cost[e.name]; });
+  const lc = { "Foreman": 41, "Equipment operator": 36, "Skilled laborer": 31, "General laborer": 24, "Truck driver (CDL)": 33, "Apprentice": 19 };
+  S.labor.forEach((l) => { if (lc[l.name]) l.cost = lc[l.name]; });
+
+  const pick = (n) => S.equipment.find((e) => e.name === n);
+  const est = newEstimate();
+  est.project = "Building pad & access drive";
+  est.client = { name: "Harbor Builders", contact: "D. Vance", phone: "(555) 771-4402", email: "", address: "" };
+  est.location = "Lot 12, Mill Creek";
+  est.scope = "Strip and stockpile topsoil, cut and fill to grade, compact building pad, "
+            + "and install a 240 ft gravel access drive to the pad.";
+  const ex = pick("Excavator (10-25 ton)"), dz = pick("Dozer (medium)"),
+        rl = pick("Roller / compactor"), dt = pick("Dump truck - tandem");
+  est.lines.equipment = [
+    { id: uid(), equipId: ex.id, desc: ex.name, qty: 34, unit: "hr", rate: 165, margin: "" },
+    { id: uid(), equipId: dz.id, desc: dz.name, qty: 26, unit: "hr", rate: 148, margin: "" },
+    { id: uid(), equipId: rl.id, desc: rl.name, qty: 10, unit: "hr", rate: 68,  margin: "" },
+    { id: uid(), equipId: dt.id, desc: dt.name, qty: 18, unit: "hr", rate: 95,  margin: "" }
+  ];
+  est.lines.labor = [
+    { id: uid(), classId: S.labor[0].id, desc: "Foreman",            hours: 48, otHours: 6, rate: 41, margin: "" },
+    { id: uid(), classId: S.labor[1].id, desc: "Equipment operator", hours: 88, otHours: 8, rate: 36, margin: "" },
+    { id: uid(), classId: S.labor[3].id, desc: "General laborer",    hours: 40, otHours: 0, rate: 24, margin: "" }
+  ];
+  est.lines.materials = [
+    { id: uid(), desc: "Crushed stone, #57", qty: 210, unit: "ton", rate: 21.5, margin: "", taxable: true },
+    { id: uid(), desc: "Geotextile fabric",  qty: 9,   unit: "roll", rate: 148, margin: "", taxable: true }
+  ];
+  est.lines.mobilization = [
+    { id: uid(), desc: "Lowboy moves in / out", qty: 4, unit: "load", rate: 425, margin: "" }
+  ];
+  est.contingencyPct = 5;
+  est.detail = "detailed";
+  S.currentId = est.id;
+  save();
+  return true;
+}
+
+if (seedDemo()) {
+  setTimeout(() => toast("Demo data loaded — this is what a filled-in estimate looks like"), 500);
+}
+
 applyBrand();
 setView("estimates");
 </script>

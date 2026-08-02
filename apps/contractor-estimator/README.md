@@ -56,6 +56,16 @@ as its own line. Overtime hours bill at the class rate times the overtime multip
 
 The quote document shows **sell prices only** — your cost and your margin never render on it.
 
+## Showing it to someone
+
+Open the file with `#demo` on the end of the URL — `index.html#demo` — and it loads a worked
+example: a fictional company, real-looking rates, and a finished $39K site-work quote. Useful
+when you want someone to *see* the thing working in three seconds instead of imagining it from
+an empty screen.
+
+Demo data only seeds on a device with nothing saved yet. If there is any real data in the
+browser, `#demo` does nothing at all — it will not overwrite your work.
+
 ## Data and backups
 
 Everything is stored in the browser's `localStorage`, on that device only. There is no
