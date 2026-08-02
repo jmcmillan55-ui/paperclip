@@ -605,6 +605,7 @@ table.q-tbl tr.sub td.n { font-weight: 700; }
       <button class="tab" data-view="estimates" aria-current="true">Estimates</button>
       <button class="tab" data-view="build">Build</button>
       <button class="tab" data-view="takeoff">Takeoff</button>
+      <button class="tab" data-view="timber">Timber</button>
       <button class="tab" data-view="quote">Quote</button>
       <button class="tab" data-view="rates">Rates</button>
       <button class="tab" data-view="setup">Setup</button>
@@ -647,6 +648,10 @@ table.q-tbl tr.sub td.n { font-weight: 700; }
   <!-- ══════════ QUOTE ══════════ -->
   <section class="view" id="view-takeoff" hidden>
     <div id="takeoffBody"></div>
+  </section>
+
+  <section class="view" id="view-timber" hidden>
+    <div id="timberBody"></div>
   </section>
 
   <section class="view" id="view-quote" hidden>
@@ -865,6 +870,24 @@ const SEED_LABOR = [
   ["APR", "Apprentice"]
 ];
 
+/* Common timber species as a starting list. Values ship at 0 — stumpage moves
+   by species, grade, market, and week, so the only honest default is blank. */
+const SEED_SPECIES = [
+  "Pine — loblolly", "Pine — shortleaf", "Pine — white", "Oak — red", "Oak — white",
+  "Hickory", "Yellow poplar", "Maple", "Sweetgum", "Ash", "Beech", "Cherry",
+  "Cedar", "Cypress", "Birch", "Mixed hardwood pulp"
+];
+
+/* Fixed-radius plot sizes. Expansion factor is 1 / plot acres, so a 1/10-acre
+   plot count multiplies by 10 to reach trees per acre. Radius is what the crew
+   actually measures with a tape from plot centre. */
+const PLOT_SIZES = [
+  { label: "1/5 acre",   acres: 1 / 5,   ef: 5,   radius: 52.7 },
+  { label: "1/10 acre",  acres: 1 / 10,  ef: 10,  radius: 37.2 },
+  { label: "1/20 acre",  acres: 1 / 20,  ef: 20,  radius: 26.3 },
+  { label: "1/100 acre", acres: 1 / 100, ef: 100, radius: 11.8 }
+];
+
 const CATEGORIES = [
   { key: "equipment",   label: "Equipment",          eyebrow: "Machine time" },
   { key: "labor",       label: "Labor",              eyebrow: "Field crew" },
@@ -874,7 +897,7 @@ const CATEGORIES = [
 ];
 
 const UNITS = ["hr", "day", "week", "month"];
-const MOB_UNITS = ["load", "mile", "trip", "each", "flat"];
+const MOB_UNITS = ["load", "ton-mile", "mile", "trip", "each", "flat"];
 const MAT_UNITS = ["each", "ton", "yd³", "gal", "ft", "lf", "sf", "sy", "acre", "roll", "bag", "lot"];
 
 /* Generic starting boilerplate. Edit both of these on the Setup screen —
@@ -913,6 +936,7 @@ function freshState() {
       id: uid(), code, name, category, unit: "hr", cost: 0
     })),
     labor: SEED_LABOR.map(([code, name]) => ({ id: uid(), code, name, cost: 0 })),
+    species: SEED_SPECIES.map((name) => ({ id: uid(), name, valuePerTree: 0, tonsPerTree: 0, active: false })),
     estimates: [],
     seq: 1,
     currentId: null
@@ -937,6 +961,7 @@ function load() {
       },
       equipment: Array.isArray(parsed.equipment) && parsed.equipment.length ? parsed.equipment : base.equipment,
       labor: Array.isArray(parsed.labor) && parsed.labor.length ? parsed.labor : base.labor,
+      species: Array.isArray(parsed.species) && parsed.species.length ? parsed.species : base.species,
       estimates: Array.isArray(parsed.estimates) ? parsed.estimates : []
     };
   } catch (err) {
@@ -1115,6 +1140,7 @@ function setView(v) {
   if (v === "estimates") renderList();
   if (v === "build")     renderBuild();
   if (v === "takeoff")   renderTakeoff();
+  if (v === "timber")    renderTimber();
   if (v === "quote")     renderQuote();
   if (v === "rates")     renderRates();
   if (v === "setup")     renderSetup();
@@ -1574,7 +1600,9 @@ function takeoffDefaults() {
     depth: 0, depthUnit: "in",
     material: "Crushed stone, #57",
     density: 2800, swell: 15, shrink: 0,
-    truckTons: 20           // typical tandem load; tri-axle runs nearer 30
+    truckTons: 20,          // typical tandem load; tri-axle runs nearer 30
+    haulTons: 0, haulMiles: 0,
+    tonMileRate: 0.22       // placeholder — put your own rate in
   };
 }
 let TK = takeoffDefaults();
@@ -1611,7 +1639,7 @@ function renderTakeoff() {
     <div class="panel-body">
       <label class="field"><span>What is this for? (prints on the estimate)</span>
         <input type="text" data-tk="label" value="${esc(TK.label)}" placeholder="Access drive — 240 ft" /></label>
-      <div class="g4 mt4">
+      <div class="grid g4 mt4">
         ${TK.mode === "lwd" ? `
           <label class="field"><span>Length (ft)</span><input type="number" step="0.1" data-tk="length" value="${esc(TK.length)}" /></label>
           <label class="field"><span>Width (ft)</span><input type="number" step="0.1" data-tk="width" value="${esc(TK.width)}" /></label>
@@ -1632,7 +1660,7 @@ function renderTakeoff() {
   <div class="panel">
     <div class="panel-head"><span class="eyebrow">Material</span><h2>Weight &amp; behaviour</h2></div>
     <div class="panel-body">
-      <div class="g4">
+      <div class="grid g4">
         <label class="field"><span>Material</span>
           <select data-tk="material">
             ${TAKEOFF_MATERIALS.map(([n]) => `<option${n === TK.material ? " selected" : ""}>${esc(n)}</option>`).join("")}
@@ -1655,12 +1683,38 @@ function renderTakeoff() {
         <div><div class="eyebrow">Loose yd³ (haul)</div><div class="num" style="font-size:var(--t-lg)">${n1(c.looseCy)}</div></div>
         <div><div class="eyebrow">Compacted yd³</div><div class="num" style="font-size:var(--t-lg)">${n1(c.compCy)}</div></div>
       </div>
-      <div class="g2 mt4">
+      <div class="grid g2 mt4">
         <label class="field"><span>Truck capacity (tons per load)</span>
           <input type="number" step="0.5" data-tk="truckTons" value="${esc(TK.truckTons)}" /></label>
         <div class="field"><span>Loads</span>
           <div class="num" style="font-size:var(--t-lg);padding-top:6px">${n1(c.loads)} <span class="subtle">(${Math.ceil(c.loads)} trips)</span></div></div>
       </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Haul</span><h2>Loaded ton-mile</h2></div>
+    <div class="panel-body">
+      <p class="subtle" style="margin-top:0">Trucking billed the way the scale ticket reads:
+        tons on the truck × loaded miles × your rate. Deadhead back is in your rate, not the miles.</p>
+      <div class="grid g4">
+        <label class="field"><span>Tons hauled</span>
+          <input type="number" step="0.1" data-tk="haulTons" value="${esc(TK.haulTons)}" /></label>
+        <label class="field"><span>Loaded miles (one way)</span>
+          <input type="number" step="0.1" data-tk="haulMiles" value="${esc(TK.haulMiles)}" /></label>
+        <label class="field"><span>Rate $ / ton-mile</span>
+          <input type="number" step="0.01" data-tk="tonMileRate" value="${esc(TK.tonMileRate)}" /></label>
+        <div class="field"><span>Ton-miles</span>
+          <div class="num" style="font-size:var(--t-lg);padding-top:6px">${n1(num(TK.haulTons) * num(TK.haulMiles))}</div></div>
+      </div>
+      <div class="totalbar" style="margin-top:var(--s4)"><div class="totalbar-in">
+        <div><div class="eyebrow">Haul cost</div>
+          <div class="num" style="font-size:var(--t-xl)">${money.format(num(TK.haulTons) * num(TK.haulMiles) * num(TK.tonMileRate))}</div></div>
+        <div class="btn-row">
+          <button class="btn ghost sm" data-tk-fill="tons">Use ${n1(c.tons)} tons from above</button>
+          <button class="btn sm" data-send="tonmile">Add haul to estimate</button>
+        </div>
+      </div></div>
     </div>
   </div>
 
@@ -1707,6 +1761,181 @@ function saveTakeoff(est, c) {
     density: num(TK.density), swell: num(TK.swell), shrink: num(TK.shrink),
     bankCy: c.bankCy, looseCy: c.looseCy, compCy: c.compCy, tons: c.tons, loads: c.loads
   });
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Timber cruise
+   ──────────────────────────────────────────────────────────────
+   Fixed-radius plot cruising, the way it is actually done on a
+   tract: walk a set number of plots of a known size, count the
+   stems in each by species, average across the plots, and blow
+   that average up to the acre with the expansion factor.
+
+     trees per acre = (total counted / plots walked) x EF
+     trees on tract = trees per acre x acres
+
+   EF is 1 / plot size in acres, so a 1/10-acre plot counts x10.
+   More plots means a tighter number; five or six on a small tract
+   is a reasonable floor, and the screen says so when you are under.
+   ══════════════════════════════════════════════════════════════ */
+function ensureCruise(est) {
+  if (!est.cruise) est.cruise = { acres: 0, plotIdx: 1, plots: [] };
+  if (!Array.isArray(est.cruise.plots)) est.cruise.plots = [];
+  return est.cruise;
+}
+
+function cruiseCalc(est) {
+  const cr = ensureCruise(est);
+  const size = PLOT_SIZES[cr.plotIdx] || PLOT_SIZES[1];
+  const active = S.species.filter((s) => s.active);
+  const nPlots = cr.plots.length;
+  const rows = active.map((sp) => {
+    const total = cr.plots.reduce((a, p) => a + num((p.counts || {})[sp.id]), 0);
+    const avg = nPlots ? total / nPlots : 0;
+    const tpa = avg * size.ef;
+    const trees = tpa * num(cr.acres);
+    return {
+      id: sp.id, name: sp.name, total, avg, tpa, trees,
+      tons: trees * num(sp.tonsPerTree),
+      value: trees * num(sp.valuePerTree)
+    };
+  });
+  return {
+    size, nPlots, rows,
+    trees: rows.reduce((a, r) => a + r.trees, 0),
+    tons:  rows.reduce((a, r) => a + r.tons, 0),
+    value: rows.reduce((a, r) => a + r.value, 0)
+  };
+}
+
+function renderTimber() {
+  const est = current();
+  const host = $("#timberBody");
+  if (!est) {
+    host.innerHTML = `<div class="notice info"><div>No estimate open. Start or open one under
+      <a href="#" data-goto="estimates">Estimates</a> — a cruise is saved against the job.</div></div>`;
+    return;
+  }
+  const cr = ensureCruise(est);
+  const c = cruiseCalc(est);
+  const n1 = (v) => (Math.round(v * 10) / 10).toLocaleString();
+  const n0 = (v) => Math.round(v).toLocaleString();
+  const active = S.species.filter((s) => s.active);
+  const unpriced = active.filter((s) => !num(s.valuePerTree)).length;
+
+  host.innerHTML = `
+  <div class="notice info"><div><strong>Timber cruise.</strong> Walk plots of a known size, count the
+    stems in each, and the tract number falls out. Trees per acre is the plot average times the
+    expansion factor; the tract total is that times your acres.</div></div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Tract</span><h2>Size &amp; plot type</h2></div>
+    <div class="panel-body">
+      <div class="grid g3">
+        <label class="field"><span>Tract acres</span>
+          <input type="number" step="0.1" data-cr="acres" value="${esc(cr.acres)}" /></label>
+        <label class="field"><span>Plot size</span>
+          <select data-cr="plotIdx">
+            ${PLOT_SIZES.map((p, i) => `<option value="${i}"${i === cr.plotIdx ? " selected" : ""}>${esc(p.label)}</option>`).join("")}
+          </select></label>
+        <div class="field"><span>Measure from plot centre</span>
+          <div class="num" style="font-size:var(--t-lg);padding-top:6px">${c.size.radius} ft</div></div>
+      </div>
+      <p class="subtle mt4">Each ${esc(c.size.label)} plot counts for <strong>×${c.size.ef}</strong> when
+        going to the acre.</p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Species</span><h2>On this tract</h2>
+      <span class="subtle">${active.length} selected</span></div>
+    <div class="panel-body">
+      <div class="att">
+        ${S.species.map((s) => `
+          <label class="${s.active ? "on" : ""}">
+            <input type="checkbox" data-sp-active="${s.id}" ${s.active ? "checked" : ""} /> ${esc(s.name)}
+          </label>`).join("")}
+      </div>
+      <div class="btn-row mt4"><button class="btn ghost sm" id="addSpecies">+ Add species</button></div>
+
+      ${active.length ? `
+        <div class="eyebrow mt4">Value per tree</div>
+        ${unpriced ? `<div class="notice"><div><strong>${unpriced} species still at $0</strong> — a tree
+          priced at $0 contributes nothing to the tract value below.</div></div>` : ""}
+        <div class="lines">
+          ${active.map((s) => `
+            <div class="lrow">
+              <label class="field"><span>Species</span><input type="text" data-sp="${s.id}" data-sk="name" value="${esc(s.name)}" /></label>
+              <label class="field" style="max-width:9rem"><span>$ per tree</span>
+                <input type="number" step="0.5" data-sp="${s.id}" data-sk="valuePerTree" value="${esc(s.valuePerTree)}" /></label>
+              <label class="field" style="max-width:9rem"><span>Tons per tree</span>
+                <input type="number" step="0.05" data-sp="${s.id}" data-sk="tonsPerTree" value="${esc(s.tonsPerTree)}" /></label>
+            </div>`).join("")}
+        </div>
+        <p class="subtle mt4">Tons per tree is optional — fill it in and the cruise also gives you a haul
+          tonnage you can push to the ton-mile calculator on <a href="#" data-goto="takeoff">Takeoff</a>.</p>
+      ` : `<div class="lines-empty mt4">Tick the species growing on this tract to price them.</div>`}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Count</span><h2>Plots walked</h2>
+      <span class="subtle">${c.nPlots}</span></div>
+    <div class="panel-body">
+      ${!active.length ? `<div class="lines-empty">Pick your species first.</div>` : ""}
+      ${c.nPlots && c.nPlots < 5 ? `<div class="notice"><div><strong>${c.nPlots} plot${c.nPlots === 1 ? "" : "s"}.</strong>
+        Five or six spread across the tract gives a number worth standing behind — one or two can be off badly.</div></div>` : ""}
+      ${cr.plots.map((p, i) => `
+        <div class="tpl-sec">
+          <div class="panel-head" style="padding:0 0 var(--s2)">
+            <span class="eyebrow">Plot ${i + 1}</span>
+            <button class="btn ghost sm" data-rm-plot="${i}">Remove</button>
+          </div>
+          <div class="grid g4">
+            ${active.map((s) => `
+              <label class="field"><span>${esc(s.name)}</span>
+                <input type="number" step="1" min="0" data-plot="${i}" data-spid="${s.id}"
+                       value="${esc((p.counts || {})[s.id] || 0)}" /></label>`).join("")}
+          </div>
+        </div>`).join("")}
+      ${active.length ? `<div class="btn-row mt4"><button class="btn ghost sm" id="addPlot">+ Add plot</button></div>` : ""}
+    </div>
+  </div>
+
+  ${c.nPlots && num(cr.acres) ? `
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Result</span><h2>Tract totals</h2></div>
+    <div class="panel-body">
+      <table class="q-tbl">
+        <thead><tr><th>Species</th><th class="r">Counted</th><th class="r">Per plot</th>
+          <th class="r">Per acre</th><th class="r">On tract</th><th class="r">Tons</th><th class="r">Value</th></tr></thead>
+        <tbody>
+          ${c.rows.map((r) => `<tr>
+            <td>${esc(r.name)}</td>
+            <td class="n r">${r.total}</td>
+            <td class="n r">${n1(r.avg)}</td>
+            <td class="n r">${n1(r.tpa)}</td>
+            <td class="n r">${n0(r.trees)}</td>
+            <td class="n r">${r.tons ? n1(r.tons) : "—"}</td>
+            <td class="n r">${r.value ? money0.format(r.value) : "—"}</td>
+          </tr>`).join("")}
+          <tr class="sub">
+            <td><strong>Total</strong></td><td class="n r"></td><td class="n r"></td><td class="n r"></td>
+            <td class="n r"><strong>${n0(c.trees)}</strong></td>
+            <td class="n r"><strong>${c.tons ? n1(c.tons) : "—"}</strong></td>
+            <td class="n r"><strong>${c.value ? money0.format(c.value) : "—"}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="subtle mt4">${n0(c.trees)} stems across ${esc(cr.acres)} acres, from ${c.nPlots}
+        ${esc(c.size.label)} plot${c.nPlots === 1 ? "" : "s"}.
+        ${c.value ? ` Standing value of ${money0.format(c.value)} is what the wood is worth — it is not a line on the quote, it is what tells you how to bid the clearing.` : ""}</p>
+      ${c.tons ? `<div class="btn-row mt4">
+        <button class="btn ghost" id="tonsToHaul">Send ${n1(c.tons)} tons to the haul calculator</button>
+      </div>` : ""}
+    </div>
+  </div>` : ""}`;
 }
 
 function renderQuote() {
@@ -2234,6 +2463,9 @@ $("#takeoffBody").addEventListener("click", (ev) => {
     touch(); renderTakeoff(); return;
   }
 
+  const fill = ev.target.closest("[data-tk-fill]");
+  if (fill) { TK.haulTons = Math.round(takeoffCalc(TK).tons * 10) / 10; renderTakeoff(); return; }
+
   const send = ev.target.closest("[data-send]");
   if (!send) return;
   const est = current(); if (!est) return;
@@ -2250,6 +2482,18 @@ $("#takeoffBody").addEventListener("click", (ev) => {
     toast(`${Math.round(c.tons * 10) / 10} tons added — set the price per ton on Build`);
     setView("build"); return;
   }
+  if (what === "tonmile") {
+    const tons = num(TK.haulTons), miles = num(TK.haulMiles), rate = num(TK.tonMileRate);
+    if (!tons || !miles) { toast("Enter tons and loaded miles first"); return; }
+    est.lines.mobilization.push({
+      id: uid(),
+      desc: `Haul — ${Math.round(tons * 10) / 10} tons × ${miles} loaded mi`,
+      qty: Math.round(tons * miles * 10) / 10, unit: "ton-mile", rate, margin: ""
+    });
+    touch();
+    toast(`${Math.round(tons * miles * 10) / 10} ton-miles added at $${rate}/ton-mile`);
+    setView("build"); return;
+  }
   if (what === "haul") {
     est.lines.mobilization.push({
       id: uid(), desc: `Haul — ${name}`,
@@ -2260,6 +2504,61 @@ $("#takeoffBody").addEventListener("click", (ev) => {
     setView("build"); return;
   }
   saveTakeoff(est, c); touch(); renderTakeoff(); toast("Takeoff saved to this estimate");
+});
+
+/* ── timber wiring ── */
+$("#timberBody").addEventListener("input", (ev) => {
+  const est = current(); if (!est) return;
+  const t = ev.target;
+  if (t.dataset.cr) {
+    const cr = ensureCruise(est);
+    cr[t.dataset.cr] = t.dataset.cr === "plotIdx" ? Number(t.value) : num(t.value);
+    touch(); renderTimber(); return;
+  }
+  if (t.dataset.sp) {
+    const sp = S.species.find((x) => x.id === t.dataset.sp);
+    if (!sp) return;
+    sp[t.dataset.sk] = t.dataset.sk === "name" ? t.value : num(t.value);
+    save(); renderTimber(); return;
+  }
+  if (t.dataset.plot !== undefined) {
+    const cr = ensureCruise(est);
+    const p = cr.plots[Number(t.dataset.plot)];
+    if (!p) return;
+    if (!p.counts) p.counts = {};
+    p.counts[t.dataset.spid] = num(t.value);
+    touch(); renderTimber(); return;
+  }
+});
+
+$("#timberBody").addEventListener("change", (ev) => {
+  const t = ev.target;
+  if (t.dataset.spActive !== undefined) {
+    const sp = S.species.find((x) => x.id === t.dataset.spActive);
+    if (sp) { sp.active = t.checked; save(); renderTimber(); }
+  }
+});
+
+$("#timberBody").addEventListener("click", (ev) => {
+  const est = current(); if (!est) return;
+  const t = ev.target;
+  if (t.id === "addSpecies") {
+    S.species.push({ id: uid(), name: "New species", valuePerTree: 0, tonsPerTree: 0, active: true });
+    save(); renderTimber(); return;
+  }
+  if (t.id === "addPlot") {
+    ensureCruise(est).plots.push({ id: uid(), counts: {} });
+    touch(); renderTimber(); return;
+  }
+  const rp = t.closest("[data-rm-plot]");
+  if (rp) { ensureCruise(est).plots.splice(Number(rp.dataset.rmPlot), 1); touch(); renderTimber(); return; }
+  if (t.id === "tonsToHaul") {
+    const c = cruiseCalc(est);
+    TK.haulTons = Math.round(c.tons * 10) / 10;
+    setView("takeoff");
+    toast(`${TK.haulTons} tons loaded into the haul calculator`);
+    return;
+  }
 });
 
 applyBrand();

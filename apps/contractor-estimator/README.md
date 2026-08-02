@@ -62,6 +62,45 @@ table.
 `Add as mobilization` adds the trips. Either way the takeoff is saved on the estimate, so
 months later you can still show how you arrived at the number.
 
+## Timber cruise
+
+The **Timber** screen estimates a tract by fixed-radius plots, the way a cruise is actually
+walked: pick a plot size, walk a handful of plots, count the stems in each by species, and the
+tract number falls out.
+
+```
+trees per acre = (total counted ÷ plots walked) × expansion factor
+trees on tract = trees per acre × acres
+```
+
+The expansion factor is 1 ÷ plot size in acres, so a 1/10-acre plot counts ×10. The screen shows
+the radius to measure from plot centre for each size — 52.7 ft for 1/5 acre, 37.2 for 1/10,
+26.3 for 1/20, 11.8 for 1/100 — and warns when you are under five plots, since one or two can be
+off badly.
+
+Each species carries a **value per tree** and an optional **tons per tree**. Values ship at $0,
+because stumpage moves by species, grade, market, and week, and any default would be a lie. The
+tract table then gives counted / per plot / per acre / on tract / tons / value by species.
+
+Standing timber value is shown as decision information, not as a line on the quote. It is what
+tells you how to bid the clearing, not what you bill the client.
+
+If tons per tree is filled in, one button pushes the tract tonnage straight into the haul
+calculator.
+
+## Loaded ton-mile haul
+
+Trucking priced the way the scale ticket reads:
+
+```
+ton-miles = tons on the truck × loaded miles (one way)
+haul      = ton-miles × your $ per ton-mile
+```
+
+Deadhead belongs in your rate, not in the miles. The tonnage can come from the dirt takeoff, from
+a timber cruise, or be typed in. `Add haul to estimate` puts it on the quote as a mobilization
+line priced per ton-mile.
+
 ## How the margin math works
 
 Prices use **gross margin**, not markup:
