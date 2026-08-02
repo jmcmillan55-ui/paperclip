@@ -101,6 +101,30 @@ Deadhead belongs in your rate, not in the miles. The tonnage can come from the d
 a timber cruise, or be typed in. `Add haul to estimate` puts it on the quote as a mobilization
 line priced per ton-mile.
 
+## Tract boundary, acreage, and KMZ
+
+The **Map** screen turns a walked property line into acreage and a file the landowner can open.
+
+Walk the boundary and tap **Drop point at my location** at each corner — the phone's GPS supplies
+the coordinate and the point records the accuracy it had at the time. Corners can also be typed
+in by hand from a deed, a plat, or a handheld unit, and GPS failures fall back to that with a
+message rather than a dead button.
+
+Three points closes a shape. From there you get acres, square feet, perimeter, and a button that
+drops the acreage straight onto the timber cruise.
+
+Area is a shoelace calculation on a local equirectangular projection — longitude scaled by the
+cosine of your latitude, so a degree of longitude is the right width for where you actually
+stand. Checked against an independent spherical-polygon calculation on a 1,320 ft square it
+agrees to four decimal places. That is far tighter than the line you walked with a phone.
+
+Note that area is measured flat, on the ground plane. A steep tract has more surface than that —
+but land is sold flat, so flat is the number you want.
+
+**Export** writes KMZ or KML. A KMZ is a ZIP holding `doc.kml`, written here by hand with stored
+entries, so there is no library and nothing external — consistent with the rest of the app. The
+polygon comes out styled and closed, with a named placemark on every corner.
+
 ## How the margin math works
 
 Prices use **gross margin**, not markup:

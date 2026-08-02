@@ -272,6 +272,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   text-transform: uppercase; letter-spacing: .08em; color: var(--hunter);
 }
 .lrow .ta-r { text-align: right; }
+.lrow.auto {
+  display: flex; flex-wrap: wrap; gap: var(--s3); align-items: flex-end;
+}
+.lrow.auto > .field { flex: 1 1 8rem; }
+
 .lrow-out {
   font-family: var(--mono); font-variant-numeric: tabular-nums;
   font-size: var(--t-sm); text-align: right; white-space: nowrap;
@@ -606,6 +611,7 @@ table.q-tbl tr.sub td.n { font-weight: 700; }
       <button class="tab" data-view="build">Build</button>
       <button class="tab" data-view="takeoff">Takeoff</button>
       <button class="tab" data-view="timber">Timber</button>
+      <button class="tab" data-view="map">Map</button>
       <button class="tab" data-view="quote">Quote</button>
       <button class="tab" data-view="rates">Rates</button>
       <button class="tab" data-view="setup">Setup</button>
@@ -652,6 +658,10 @@ table.q-tbl tr.sub td.n { font-weight: 700; }
 
   <section class="view" id="view-timber" hidden>
     <div id="timberBody"></div>
+  </section>
+
+  <section class="view" id="view-map" hidden>
+    <div id="mapBody"></div>
   </section>
 
   <section class="view" id="view-quote" hidden>
@@ -1141,6 +1151,7 @@ function setView(v) {
   if (v === "build")     renderBuild();
   if (v === "takeoff")   renderTakeoff();
   if (v === "timber")    renderTimber();
+  if (v === "map")       renderMap();
   if (v === "quote")     renderQuote();
   if (v === "rates")     renderRates();
   if (v === "setup")     renderSetup();
@@ -1865,7 +1876,7 @@ function renderTimber() {
           priced at $0 contributes nothing to the tract value below.</div></div>` : ""}
         <div class="lines">
           ${active.map((s) => `
-            <div class="lrow">
+            <div class="lrow auto">
               <label class="field"><span>Species</span><input type="text" data-sp="${s.id}" data-sk="name" value="${esc(s.name)}" /></label>
               <label class="field" style="max-width:9rem"><span>$ per tree</span>
                 <input type="number" step="0.5" data-sp="${s.id}" data-sk="valuePerTree" value="${esc(s.valuePerTree)}" /></label>
@@ -1936,6 +1947,231 @@ function renderTimber() {
       </div>` : ""}
     </div>
   </div>` : ""}`;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Tract boundary → acreage → KMZ
+   ──────────────────────────────────────────────────────────────
+   Walk the property line dropping a point at each corner, and the
+   polygon gives you acreage without waiting on a survey, plus a
+   KMZ the landowner can open in Google Earth.
+
+   Area is shoelace on a local equirectangular projection: lon is
+   scaled by cos(latitude) so a degree of longitude is the right
+   width for where you actually are. Good to a fraction of a
+   percent at tract scale, which is far tighter than the boundary
+   you walked with a phone.
+
+   A KMZ is just a ZIP holding doc.kml. Entries are written STORED
+   (no compression) — Google Earth accepts it, and it means no
+   library and no external dependency.
+   ══════════════════════════════════════════════════════════════ */
+const EARTH_R = 6371008.8;          // mean radius, metres
+const SQM_PER_ACRE = 4046.8564224;
+
+function ensureBoundary(est) {
+  if (!est.boundary) est.boundary = { name: "", points: [] };
+  if (!Array.isArray(est.boundary.points)) est.boundary.points = [];
+  return est.boundary;
+}
+
+function boundaryMetrics(pts) {
+  const good = pts.filter((p) => Number.isFinite(num(p.lat, NaN)) && Number.isFinite(num(p.lon, NaN)));
+  if (good.length < 3) return { n: good.length, acres: 0, sqm: 0, perimFt: 0, good };
+  const lat0 = good.reduce((a, p) => a + num(p.lat), 0) / good.length;
+  const k = Math.cos((lat0 * Math.PI) / 180);
+  const xy = good.map((p) => ({
+    x: (num(p.lon) * Math.PI / 180) * EARTH_R * k,
+    y: (num(p.lat) * Math.PI / 180) * EARTH_R
+  }));
+  let a2 = 0, perim = 0;
+  for (let i = 0; i < xy.length; i++) {
+    const j = (i + 1) % xy.length;
+    a2 += xy[i].x * xy[j].y - xy[j].x * xy[i].y;
+    perim += Math.hypot(xy[j].x - xy[i].x, xy[j].y - xy[i].y);
+  }
+  const sqm = Math.abs(a2) / 2;
+  return { n: good.length, sqm, acres: sqm / SQM_PER_ACRE, perimFt: perim * 3.280839895, good };
+}
+
+/* ── minimal STORED-entry zip writer ── */
+const CRC_TABLE = (() => {
+  const tbl = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    tbl[n] = c >>> 0;
+  }
+  return tbl;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipStored(files) {
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+  const d = new Date();
+  const dosTime = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+
+  files.forEach((f) => {
+    const name = enc.encode(f.name);
+    const data = enc.encode(f.data);
+    const crc = crc32(data);
+
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034B50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0, true);
+    lh.setUint16(8, 0, true);                       // method 0 = stored
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true);
+    lh.setUint32(14, crc, true);
+    lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true);
+    lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), name, data);
+
+    const cd = new DataView(new ArrayBuffer(46));
+    cd.setUint32(0, 0x02014B50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
+    cd.setUint16(8, 0, true); cd.setUint16(10, 0, true);
+    cd.setUint16(12, dosTime, true); cd.setUint16(14, dosDate, true);
+    cd.setUint32(16, crc, true);
+    cd.setUint32(20, data.length, true); cd.setUint32(24, data.length, true);
+    cd.setUint16(28, name.length, true); cd.setUint16(30, 0, true); cd.setUint16(32, 0, true);
+    cd.setUint16(34, 0, true); cd.setUint16(36, 0, true); cd.setUint32(38, 0, true);
+    cd.setUint32(42, offset, true);
+    central.push(new Uint8Array(cd.buffer), name);
+    offset += 30 + name.length + data.length;
+  });
+
+  const cdSize = central.reduce((a, p) => a + p.length, 0);
+  const eo = new DataView(new ArrayBuffer(22));
+  eo.setUint32(0, 0x06054B50, true);
+  eo.setUint16(8, files.length, true); eo.setUint16(10, files.length, true);
+  eo.setUint32(12, cdSize, true); eo.setUint32(16, offset, true);
+  eo.setUint16(20, 0, true);
+  return new Blob([...parts, ...central, new Uint8Array(eo.buffer)], { type: "application/vnd.google-earth.kmz" });
+}
+
+function buildKml(est) {
+  const b = ensureBoundary(est);
+  const m = boundaryMetrics(b.points);
+  const title = b.name || est.project || est.number || "Tract";
+  const coords = m.good.map((p) => `${num(p.lon)},${num(p.lat)},0`).join(" ");
+  const ring = m.good.length >= 3 ? coords + " " + `${num(m.good[0].lon)},${num(m.good[0].lat)},0` : coords;
+  const marks = m.good.map((p, i) => `    <Placemark>
+      <name>${esc(p.label || "P" + (i + 1))}</name>
+      <styleUrl>#pt</styleUrl>
+      <Point><coordinates>${num(p.lon)},${num(p.lat)},0</coordinates></Point>
+    </Placemark>`).join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${esc(title)}</name>
+    <description>${esc(m.acres ? m.acres.toFixed(2) + " acres — boundary walked with " + m.n + " points" : "Boundary")}</description>
+    <Style id="tract">
+      <LineStyle><color>ff2a8c46</color><width>3</width></LineStyle>
+      <PolyStyle><color>402a8c46</color></PolyStyle>
+    </Style>
+    <Style id="pt"><IconStyle><scale>0.9</scale></IconStyle></Style>
+${m.good.length >= 3 ? `    <Placemark>
+      <name>${esc(title)}</name>
+      <styleUrl>#tract</styleUrl>
+      <Polygon><outerBoundaryIs><LinearRing>
+        <coordinates>${ring}</coordinates>
+      </LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>` : ""}
+${marks}
+  </Document>
+</kml>`;
+}
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+function renderMap() {
+  const est = current();
+  const host = $("#mapBody");
+  if (!est) {
+    host.innerHTML = `<div class="notice info"><div>No estimate open. Start or open one under
+      <a href="#" data-goto="estimates">Estimates</a> — a boundary is saved against the job.</div></div>`;
+    return;
+  }
+  const b = ensureBoundary(est);
+  const m = boundaryMetrics(b.points);
+  const n2 = (v) => (Math.round(v * 100) / 100).toLocaleString();
+
+  host.innerHTML = `
+  <div class="notice info"><div><strong>Tract boundary.</strong> Walk the property line and drop a point at
+    each corner. Three points and you have acreage; export a KMZ and the landowner can open the same
+    outline in Google Earth.</div></div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Corners</span><h2>Boundary points</h2>
+      <span class="subtle">${m.n} usable</span></div>
+    <div class="panel-body">
+      <label class="field"><span>Tract name (prints in Google Earth)</span>
+        <input type="text" data-bd="name" value="${esc(b.name)}" placeholder="${esc(est.project || "North parcel")}" /></label>
+
+      <div class="btn-row mt4">
+        <button class="btn" id="gpsPoint">Drop point at my location</button>
+        <button class="btn ghost" id="addPoint">+ Add point by hand</button>
+      </div>
+      <div id="gpsMsg"></div>
+
+      <div class="lines mt4">
+        ${b.points.map((p, i) => `
+          <div class="lrow auto">
+            <label class="field" style="max-width:7rem"><span>Label</span>
+              <input type="text" data-pt="${i}" data-pk="label" value="${esc(p.label)}" placeholder="P${i + 1}" /></label>
+            <label class="field"><span>Latitude</span>
+              <input type="number" step="0.0000001" data-pt="${i}" data-pk="lat" value="${esc(p.lat)}" /></label>
+            <label class="field"><span>Longitude</span>
+              <input type="number" step="0.0000001" data-pt="${i}" data-pk="lon" value="${esc(p.lon)}" /></label>
+            ${p.acc ? `<span class="pill" title="GPS accuracy when captured">±${Math.round(p.acc)} m</span>` : ""}
+            <button class="icon-btn" data-rm-pt="${i}" title="Remove">×</button>
+          </div>`).join("") || `<div class="lines-empty">No points yet. Walk the line and drop them as you go.</div>`}
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Result</span><h2>Acreage</h2></div>
+    <div class="panel-body">
+      ${m.n < 3
+        ? `<div class="lines-empty">Three points minimum to close a shape — ${m.n} so far.</div>`
+        : `<div class="tstat" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:var(--s4)">
+             <div><div class="eyebrow">Acres</div><div class="num" style="font-size:var(--t-2xl)">${n2(m.acres)}</div></div>
+             <div><div class="eyebrow">Square feet</div><div class="num" style="font-size:var(--t-lg)">${Math.round(m.sqm * 10.7639).toLocaleString()}</div></div>
+             <div><div class="eyebrow">Perimeter</div><div class="num" style="font-size:var(--t-lg)">${Math.round(m.perimFt).toLocaleString()} ft</div></div>
+             <div><div class="eyebrow">Corners</div><div class="num" style="font-size:var(--t-lg)">${m.n}</div></div>
+           </div>
+           <div class="btn-row mt4">
+             <button class="btn ghost" id="acresToCruise">Use ${n2(m.acres)} acres in the cruise</button>
+           </div>
+           <p class="subtle mt4">Area is measured on the ground, flat. A steep tract has more surface than
+             this, but acreage is sold flat, so this is the number you want.</p>`}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span class="eyebrow">Share</span><h2>Export</h2></div>
+    <div class="panel-body">
+      <p class="subtle" style="margin-top:0">KMZ opens in Google Earth on any phone or PC. KML is the same
+        thing unzipped, if something wants the raw file.</p>
+      <div class="btn-row">
+        <button class="btn" id="expKmz" ${m.n < 1 ? "disabled" : ""}>Download KMZ</button>
+        <button class="btn ghost" id="expKml" ${m.n < 1 ? "disabled" : ""}>Download KML</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderQuote() {
@@ -2558,6 +2794,77 @@ $("#timberBody").addEventListener("click", (ev) => {
     setView("takeoff");
     toast(`${TK.haulTons} tons loaded into the haul calculator`);
     return;
+  }
+});
+
+/* ── map / boundary wiring ── */
+$("#mapBody").addEventListener("input", (ev) => {
+  const est = current(); if (!est) return;
+  const t = ev.target;
+  const b = ensureBoundary(est);
+  if (t.dataset.bd) { b[t.dataset.bd] = t.value; touch(); return; }
+  if (t.dataset.pt !== undefined) {
+    const p = b.points[Number(t.dataset.pt)];
+    if (!p) return;
+    p[t.dataset.pk] = t.dataset.pk === "label" ? t.value : num(t.value);
+    touch();
+    // Re-render for numbers so acreage tracks, but not for the label field —
+    // rebuilding on every keystroke would steal focus mid-word.
+    if (t.dataset.pk !== "label") renderMap();
+  }
+});
+
+$("#mapBody").addEventListener("click", (ev) => {
+  const est = current(); if (!est) return;
+  const b = ensureBoundary(est);
+  const t = ev.target;
+
+  if (t.id === "addPoint") { b.points.push({ id: uid(), label: "", lat: "", lon: "" }); touch(); renderMap(); return; }
+
+  const rm = t.closest("[data-rm-pt]");
+  if (rm) { b.points.splice(Number(rm.dataset.rmPt), 1); touch(); renderMap(); return; }
+
+  if (t.id === "gpsPoint") {
+    const msg = $("#gpsMsg");
+    if (!("geolocation" in navigator)) {
+      msg.innerHTML = `<div class="notice"><div>This browser will not give up a location. Add the corner by hand below.</div></div>`;
+      return;
+    }
+    msg.innerHTML = `<div class="notice info"><div>Getting a fix… stand still a moment.</div></div>`;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        b.points.push({
+          id: uid(), label: "", lat: +pos.coords.latitude.toFixed(7),
+          lon: +pos.coords.longitude.toFixed(7), acc: pos.coords.accuracy
+        });
+        touch(); renderMap();
+        toast(`Point dropped — ±${Math.round(pos.coords.accuracy)} m`);
+      },
+      (err) => {
+        const why = err.code === 1 ? "Location permission was refused."
+                  : err.code === 2 ? "No fix — try again out from under cover."
+                  : "Timed out waiting for a fix.";
+        msg.innerHTML = `<div class="notice"><div><strong>${why}</strong> You can still type the corner in by hand below.</div></div>`;
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+    return;
+  }
+
+  if (t.id === "acresToCruise") {
+    const m = boundaryMetrics(b.points);
+    ensureCruise(est).acres = Math.round(m.acres * 100) / 100;
+    touch(); setView("timber");
+    toast(`${Math.round(m.acres * 100) / 100} acres set on the cruise`);
+    return;
+  }
+
+  if (t.id === "expKml" || t.id === "expKmz") {
+    const kml = buildKml(est);
+    const base = (b.name || est.project || est.number || "tract").replace(/[^A-Za-z0-9._-]+/g, "-").slice(0, 60);
+    if (t.id === "expKml") downloadBlob(new Blob([kml], { type: "application/vnd.google-earth.kml+xml" }), base + ".kml");
+    else downloadBlob(zipStored([{ name: "doc.kml", data: kml }]), base + ".kmz");
+    toast("Downloaded");
   }
 });
 

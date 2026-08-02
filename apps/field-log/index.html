@@ -269,6 +269,11 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
   text-transform: uppercase; letter-spacing: .08em; color: var(--hunter);
 }
 .lrow .ta-r { text-align: right; }
+.lrow.auto {
+  display: flex; flex-wrap: wrap; gap: var(--s3); align-items: flex-end;
+}
+.lrow.auto > .field { flex: 1 1 8rem; }
+
 .lrow-out {
   font-family: var(--mono); font-variant-numeric: tabular-nums;
   font-size: var(--t-sm); text-align: right; white-space: nowrap;
@@ -1089,7 +1094,7 @@ function renderEditor() {
 
 function crewPanel(l) {
   const rows = l.crew.map((c, i) => `
-    <div class="lrow">
+    <div class="lrow auto">
       <label class="field"><span>Name</span><input type="text" data-row="crew" data-i="${i}" data-k="name" value="${esc(c.name)}" /></label>
       <label class="field" style="max-width:12rem"><span>Class</span>
         <select data-row="crew" data-i="${i}" data-k="cls">
@@ -1114,7 +1119,7 @@ function crewPanel(l) {
 
 function equipPanel(l) {
   const rows = l.equipment.map((e, i) => `
-    <div class="lrow">
+    <div class="lrow auto">
       <label class="field"><span>Machine</span>
         <input type="text" list="equipList" data-row="equipment" data-i="${i}" data-k="name" value="${esc(e.name)}" /></label>
       <label class="field" style="max-width:7rem"><span>Hours run</span><input type="number" step="0.25" data-row="equipment" data-i="${i}" data-k="hours" value="${esc(e.hours)}" /></label>
@@ -1134,7 +1139,7 @@ function equipPanel(l) {
 
 function delayPanel(l) {
   const rows = l.delays.map((d, i) => `
-    <div class="lrow delay-row">
+    <div class="lrow auto delay-row">
       <label class="field"><span>What happened</span><input type="text" data-row="delays" data-i="${i}" data-k="reason" value="${esc(d.reason)}" placeholder="Waiting on utility locate" /></label>
       <label class="field" style="max-width:11rem"><span>Caused by</span>
         <select data-row="delays" data-i="${i}" data-k="party">
@@ -1180,7 +1185,7 @@ function safetyPanel(l) {
 /* generic repeating-list panel */
 function listPanel(l, key, title, eyebrow, cols) {
   const rows = l[key].map((r, i) => `
-    <div class="lrow">
+    <div class="lrow auto">
       ${cols.map((c) => `<label class="field"${c.w ? ` style="max-width:${c.w}"` : ""}><span>${esc(c.label)}</span>
         <input type="${c.type}"${c.type === "number" ? ' step="0.01"' : ""} data-row="${key}" data-i="${i}" data-k="${c.k}"
                value="${esc(r[c.k])}"${c.ph ? ` placeholder="${esc(c.ph)}"` : ""} /></label>`).join("")}
@@ -1416,7 +1421,7 @@ function sheetFillPanel() {
       <div class="eyebrow mt4">Attended &amp; signed</div>
       <div class="lines">
         ${sh.attendees.map((a, i) => `
-          <div class="lrow">
+          <div class="lrow auto">
             <label class="field"><span>Name</span><input type="text" data-att-i="${i}" data-att-k="name" value="${esc(a.name)}" /></label>
             <button class="icon-btn" data-rm-att="${i}" title="Remove">×</button>
           </div>`).join("") || `<div class="lines-empty">Nobody added yet.</div>`}
@@ -1511,7 +1516,7 @@ function renderRoster() {
     <div class="panel-body">
       <div class="lines">
         ${S.crew.map((c, i) => `
-          <div class="lrow">
+          <div class="lrow auto">
             <label class="field"><span>Name</span><input type="text" data-crew="${i}" data-ck="name" value="${esc(c.name)}" /></label>
             <label class="field" style="max-width:14rem"><span>Class</span>
               <select data-crew="${i}" data-ck="cls">
@@ -1529,7 +1534,7 @@ function renderRoster() {
     <div class="panel-body">
       <div class="lines">
         ${S.equipment.map((e, i) => `
-          <div class="lrow">
+          <div class="lrow auto">
             <label class="field"><span>Machine</span><input type="text" data-eq="${i}" value="${esc(e.name)}" /></label>
             <button class="icon-btn" data-rm-eq="${i}" title="Remove">×</button>
           </div>`).join("") || `<div class="lines-empty">No machines yet.</div>`}
