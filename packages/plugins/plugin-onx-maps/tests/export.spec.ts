@@ -39,6 +39,32 @@ describe("toGpx", () => {
     expect(copy.externalKey).toBe(original.externalKey);
   });
 
+  it("writes routes as <rte>, not <trk>", () => {
+    const route = gpxMarkups.find((markup) => markup.kind === "route")!;
+    const content = toGpx([route]).content;
+    expect(content).toContain("<rte>");
+    expect(content).toContain("<rtept");
+    expect(content).not.toContain("<trk>");
+  });
+
+  it("round-trips a route as a route with a stable key", () => {
+    const original = gpxMarkups.find((markup) => markup.kind === "route")!;
+    const copy = parseGpx(toGpx([original]).content).markups[0]!;
+    expect(copy.kind).toBe("route");
+    expect(copy.externalKey).toBe(original.externalKey);
+  });
+
+  it("preserves the dedupe key for every markup in a mixed GPX export", () => {
+    // Regression: routes were previously exported as <trk>, so re-importing a
+    // generated file resurrected each route as a second, track-kinded copy of
+    // the same markup instead of deduplicating against the original.
+    const reparsed = parseGpx(toGpx(gpxMarkups).content).markups;
+    expect(reparsed).toHaveLength(gpxMarkups.length);
+    expect(new Set(reparsed.map((markup) => markup.externalKey))).toEqual(
+      new Set(gpxMarkups.map((markup) => markup.externalKey)),
+    );
+  });
+
   it("closes a polygon when flattening it to a GPX track", () => {
     const area = kmlMarkups.find((markup) => markup.kind === "area")!;
     const copy = parseGpx(toGpx([area]).content).markups[0]!;

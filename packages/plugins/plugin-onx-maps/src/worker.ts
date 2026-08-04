@@ -1,5 +1,6 @@
 import {
   definePlugin,
+  runWorker,
   type PluginApiRequestInput,
   type PluginContext,
   type ToolResult,
@@ -526,3 +527,8 @@ const plugin = definePlugin({
 });
 
 export default plugin;
+
+// Starts the stdio RPC host when this module is the child process entrypoint.
+// Without it the worker loads, resolves, and exits cleanly — which the host
+// reports as "Worker process exited (code=0)".
+runWorker(plugin, import.meta.url);
