@@ -88,17 +88,24 @@ packages/
   mcp-server/      Paperclip MCP server
   google-sheets-mcp-server/, kv-demo-mcp-server/   demo/reference MCP servers
 
-cli/               `paperclipai` CLI (onboard, run, doctor, worktree, env, routines,
-                   pipelines, db-backup, configure, heartbeat-run…)
+cli/               `paperclipai` CLI (`src/commands/`: onboard, run, doctor, worktree, env,
+                   env-lab, routines, pipelines, db-backup, configure, heartbeat-run,
+                   auth-bootstrap-ceo, allowed-hostname)
 scripts/           Dev runner, test runner, release, codemods, CI gate checks, smoke tests
 tests/             e2e/ (Playwright), release-smoke/, storybook-visual/
 doc/               Internal specs and operational docs (see §1); `doc/plans/`, `doc/design/`
 docs/              Public Mintlify docs site (`pnpm docs:dev`)
+docker/            Dockerfiles, compose stacks (quickstart, untrusted-review), agent-runtime
+                   images, quadlet units, ECS task definition
+patches/           pnpm patches for `embedded-postgres` and `acpx` (see §12)
 skills/            Paperclip runtime skills (NOT the shipped catalog)
 evals/             promptfoo eval suite (`pnpm evals:smoke`)
 tools/             agent-shim and other dev-side tooling
 design/, report/, releases/, screenshots/   working notes and generated artifacts
-.agents/, .claude/ Repo-local agent skills and subagent definitions
+.agents/skills/    ~18 repo-local task skills (release, pr-gardening, doc-maintenance,
+                   create-agent-adapter, prepare-paperclip-pr…)
+.claude/           `skills/` (company-creator, design-guide, paperclip) and `agents/`
+                   (codemod-runner, token-auditor) definitions
 ```
 
 ---
@@ -130,6 +137,8 @@ Runtime state lives under `~/.paperclip/instances/default/` (config, `db/`, `dat
 Other entry points:
 
 ```sh
+pnpm dev:server                 # server only  } the combined runner above is normally
+pnpm dev:ui                     # UI only      } what you want — these skip its supervision
 pnpm storybook                  # UI Storybook on :6006
 pnpm docs:dev                   # Mintlify docs site
 pnpm paperclipai <command>      # the CLI (onboard, doctor, worktree, run, …)
@@ -350,6 +359,12 @@ Before committing UI changes:
 pnpm check:token-gates    # scripts/check-token-gates.mjs — fails on any un-allowlisted violation
 ```
 
+Don't confuse it with `pnpm check:tokens` (`scripts/check-forbidden-tokens.mjs`), which is
+unrelated to the design system: that one scans the working tree for *forbidden strings*
+(local usernames and the list in `.git/hooks/forbidden-tokens.txt`), mirroring the
+pre-commit hook, and is a pre-publish leak guard. Neither runs in `pr.yml` — run the gate
+yourself before committing UI changes.
+
 The `design-guide` skill (`.claude/skills/design-guide/`) covers component creation in depth.
 
 ---
@@ -452,6 +467,9 @@ the names branch protection should reference, not the individual shards.
 `storybook-visual.yml` triggers on PRs to `master` but its job is gated on the
 `storybook-visual` label — without that label it reports as skipped, so add the label to
 actually get visual diffs. `release-smoke.yml` is `workflow_dispatch` only.
+`release-verify.yml` has no trigger of its own — it is `workflow_call` only, invoked twice
+by `release.yml` (canary and stable), so edit it as shared release plumbing rather than as
+a standalone workflow; `scripts/__tests__/release-verify-workflow.test.mjs` guards that wiring.
 
 **Fork posture.** Five workflows are `workflow_dispatch` only on this fork and never fire
 on their own:
