@@ -107,7 +107,13 @@ function assertWithinOnxLimits(markups: ParsedMarkup[], content: string): number
 
 export function toGpx(markups: ParsedMarkup[], filenameStem = "paperclip-onx"): ExportResult {
   const waypoints = markups.filter((markup) => markup.kind === "waypoint");
-  const paths = markups.filter((markup) => markup.kind !== "waypoint");
+  // GPX has a native <rte>, so routes round-trip losslessly and must not be
+  // flattened into <trk> — doing so changes their kind on re-import, which
+  // changes their dedupe key and produces a duplicate of the same markup.
+  const routes = markups.filter((markup) => markup.kind === "route");
+  const paths = markups.filter(
+    (markup) => markup.kind !== "waypoint" && markup.kind !== "route",
+  );
 
   const body: string[] = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -127,6 +133,20 @@ export function toGpx(markups: ParsedMarkup[], filenameStem = "paperclip-onx"): 
         tag("desc", markup.description) +
         tag("sym", markup.symbol) +
         `</wpt>`,
+    );
+  }
+
+  for (const markup of routes) {
+    const positions = positionsOfMarkup(markup);
+    if (positions.length < 2) continue;
+    const points = positions
+      .map((position) => {
+        const ele = position.length > 2 ? tag("ele", String(position[2])) : "";
+        return `    <rtept lat="${coord(position[1])}" lon="${coord(position[0])}">${ele}</rtept>`;
+      })
+      .join("\n");
+    body.push(
+      `  <rte>${tag("name", markup.name)}${tag("desc", markup.description)}\n${points}\n  </rte>`,
     );
   }
 
